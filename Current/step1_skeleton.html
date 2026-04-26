@@ -176,6 +176,14 @@ body {
 /* ── Discard Modal ── */
 #discard-hint { font-size: .8rem; color: var(--dim); margin-top: 12px; }
 
+/* ── Incompatible card (synthesis modal) ── */
+.card.incompatible {
+  opacity: .28; cursor: not-allowed;
+  /* suppress hover styles */
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+}
+
 /* ── Synthesis Modal ── */
 #synth-columns {
   display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;
@@ -274,7 +282,7 @@ body {
 <div class="overlay" id="modal-synth">
   <div class="modal-box">
     <h2>📐 Synthesize — Choose a Pair</h2>
-    <p>Select one abstract card and one concrete card. Any combination is valid. The fusion card inherits the abstract's theme tag and the concrete's memory.</p>
+    <p>Select one abstract card and one concrete card whose <strong>tags match</strong> — the concrete card's tag must equal the abstract card's symbol. Incompatible pairs are greyed out. The fusion card inherits the abstract's theme tag and the concrete's memory.</p>
     <div id="synth-columns">
       <div>
         <div class="synth-col-label">Abstract cards in deck</div>
@@ -532,25 +540,41 @@ function renderSynthModal() {
   const abstracts = STATE.deck.filter(c => c.type === 'abstract');
   const concretes = STATE.deck.filter(c => c.type === 'concrete');
 
+  // What's currently pinned on the other side?
+  const pinnedConcrete = synthSel.concrete ? STATE.deck.find(c => c.id === synthSel.concrete) : null;
+  const pinnedAbstract = synthSel.abstract ? STATE.deck.find(c => c.id === synthSel.abstract) : null;
+
   abstracts.forEach(card => {
     const el = makeCardEl(card);
-    el.classList.add('selectable');
-    if (synthSel.abstract === card.id) el.classList.add('selected');
-    el.addEventListener('click', () => {
-      synthSel.abstract = synthSel.abstract === card.id ? null : card.id;
-      renderSynthModal();
-    });
+    // Compatible if: no concrete pinned, OR pinned concrete's tag matches this abstract's sym
+    const ok = !pinnedConcrete || pinnedConcrete.tag === card.sym;
+    if (ok) {
+      el.classList.add('selectable');
+      if (synthSel.abstract === card.id) el.classList.add('selected');
+      el.addEventListener('click', () => {
+        synthSel.abstract = synthSel.abstract === card.id ? null : card.id;
+        renderSynthModal();
+      });
+    } else {
+      el.classList.add('incompatible');
+    }
     aGrid.appendChild(el);
   });
 
   concretes.forEach(card => {
     const el = makeCardEl(card);
-    el.classList.add('selectable');
-    if (synthSel.concrete === card.id) el.classList.add('selected');
-    el.addEventListener('click', () => {
-      synthSel.concrete = synthSel.concrete === card.id ? null : card.id;
-      renderSynthModal();
-    });
+    // Compatible if: no abstract pinned, OR this concrete's tag matches pinned abstract's sym
+    const ok = !pinnedAbstract || card.tag === pinnedAbstract.sym;
+    if (ok) {
+      el.classList.add('selectable');
+      if (synthSel.concrete === card.id) el.classList.add('selected');
+      el.addEventListener('click', () => {
+        synthSel.concrete = synthSel.concrete === card.id ? null : card.id;
+        renderSynthModal();
+      });
+    } else {
+      el.classList.add('incompatible');
+    }
     cGrid.appendChild(el);
   });
 
@@ -561,13 +585,19 @@ function renderSynthModal() {
   if (synthSel.abstract && synthSel.concrete) {
     const a = STATE.deck.find(c => c.id === synthSel.abstract);
     const b = STATE.deck.find(c => c.id === synthSel.concrete);
-    preview.textContent = `→ Fusion: "${b.name} / ${a.name}"  ·  tag: ${a.tag}  ·  ${b.memory ? 'carries memory' : 'no memory'}`;
+    // Both selected and already guaranteed compatible by the UI guards above
+    preview.textContent = `→ Fusion: "${b.name} / ${a.name}"  ·  tag: ${a.sym}  ·  ${b.memory ? 'carries memory' : 'no memory'}`;
     preview.className = 'ready';
     confirmBtn.disabled = false;
   } else {
-    const hint = !synthSel.abstract && !synthSel.concrete ? 'Select one abstract and one concrete card to preview.'
-               : !synthSel.abstract ? '← Select an abstract card on the left.'
-               : 'Select a concrete card on the right →';
+    let hint;
+    if (!synthSel.abstract && !synthSel.concrete) {
+      hint = 'Select an abstract card — only concrete cards with the same tag will be available.';
+    } else if (!synthSel.abstract) {
+      hint = `← Now select an abstract card with symbol "${pinnedConcrete.tag}".`;
+    } else {
+      hint = `Now select a concrete card tagged "${pinnedAbstract.sym}" →`;
+    }
     preview.textContent = hint;
     preview.className = '';
     confirmBtn.disabled = true;
@@ -579,6 +609,11 @@ function doConfirmSynth() {
   const a = STATE.deck.find(c => c.id === synthSel.abstract);
   const b = STATE.deck.find(c => c.id === synthSel.concrete);
   if (!a || !b) return;
+  // Safety guard: tags must match (UI already prevents this, but belt-and-suspenders)
+  if (b.tag !== a.sym) {
+    setLog(`Cannot fuse: "${b.name}" (tag: ${b.tag}) does not match "${a.name}" (sym: ${a.sym}).`);
+    return;
+  }
 
   spend(5);
   // Remove both source cards before adding the fusion
@@ -753,12 +788,13 @@ function buildAfternoonUI(area) {
   apt.appendChild(makeLocBtn('📞', 'Call Home',       'Telephone', 0, '+1 concrete card', doTelephone));
   apt.appendChild(makeLocBtn('💻', 'Browse Internet', 'Internet',  2, '+1 concrete card', doInternet, !hasEnergy(2)));
 
+  // A valid pair requires: concrete.tag === abstract.sym
   const canSynth = hasEnergy(5)
-    && STATE.deck.some(c => c.type === 'abstract')
-    && STATE.deck.some(c => c.type === 'concrete');
+    && STATE.deck.some(a => a.type === 'abstract'
+       && STATE.deck.some(b => b.type === 'concrete' && b.tag === a.sym));
   const synthNote = canSynth
-    ? '+1 fusion card (you choose the pair)'
-    : 'needs 1 abstract + 1 concrete + 5 energy';
+    ? '+1 fusion card (tag must match)'
+    : 'needs matching abstract+concrete pair + 5 energy';
   apt.appendChild(makeLocBtn('📐', 'Synthesize', 'Homework', 5, synthNote, openSynthModal, !canSynth));
   area.appendChild(apt);
 
@@ -965,109 +1001,6 @@ function submitHomework() {
   const diversity = allFusion ? 1 : typeSet.size;
   const divLabel  = diversity >= 3 ? 'high' : diversity === 2 ? 'medium' : 'low';
   console.log(`[Homework] Types: ${[...typeSet].join('+')}${allFusion ? ' (all-fusion penalty)' : ''} → diversity: ${divLabel}`);
-
-  // ── Feedback table (GDD §6.2) ──
-  const FEEDBACK = {
-    'fail-low':    { grade:'D',  quote:'"I don\'t see how this engages with the brief."' },
-    'fail-medium': { grade:'C',  quote:'"Some engagement, but where\'s the brief in this?"' },
-    'fail-high':   { grade:'C+', quote:'"Rich vocabulary, but you didn\'t answer the question."' },
-    'pass-low':    { grade:'B-', quote:'"Technically on-brief, but where\'s the work?"' },
-    'pass-medium': { grade:'B',  quote:'"Some engagement, but feels collaged."' },
-    'pass-high':   { grade:'A',  quote:'"A clear voice working through the brief. This is the work."' },
-  };
-  const key = `${themePass ? 'pass' : 'fail'}-${divLabel}`;
-  const fb  = allFusion
-    ? { grade:'B-', quote:'"Strong voice but underdeveloped — where\'s the rigor?"' }
-    : (FEEDBACK[key] || { grade:'C', quote:'"Submission received."' });
-
-  console.log(`[Homework] Key: ${allFusion ? 'all-fusion' : key} → Grade: ${fb.grade}`);
-
-  // ── Show feedback ──
-  STATE.hwActive = false;
-  STATE.phase = 'done';
-  document.getElementById('hw-area').style.display = 'none';
-  document.getElementById('action-area').innerHTML = '';
-  renderDeck();
-
-  const fbArea = document.getElementById('fb-area');
-  fbArea.style.display = 'block';
-  document.getElementById('fb-grade').textContent = `Grade: ${fb.grade}`;
-  document.getElementById('fb-quote').textContent = fb.quote;
-  document.getElementById('fb-detail').textContent = [
-    `Brief: "${brief}"`,
-    `Theme match: ${hits}/4 cards on-brief  →  ${themePass ? 'PASSED' : 'FAILED'}`,
-    `Diversity: ${[...typeSet].join(' + ')}${allFusion ? '  (all-fusion — penalised)' : ''}  →  ${divLabel}`,
-    '',
-    'Per-card:',
-    ...judgeLines,
-  ].join('\n');
-
-  document.getElementById('fb-next').onclick = () => {
-    fbArea.style.display = 'none';
-    const { title, body } = getEnding();
-    showEnd(title, body);
-  };
-}
-
-/* ═══════════════════════════════════════════════════════════
-   ENDING  (GDD §7)
-═══════════════════════════════════════════════════════════ */
-
-function getEnding() {
-  const native = STATE.deck.filter(c => c.origin === 'native').length;
-  const fusion = STATE.deck.filter(c => c.type === 'fusion').length;
-  const absFus = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
-
-  if (fusion >= 3) {
-    return { title: 'Fluent in Two Tongues',
-             body:  'Neither fully here nor there. Both. It\'s exhausting. It\'s yours.' };
-  }
-  if (native <= 2 && fusion === 0) {
-    return { title: 'Clean Slate',
-             body:  'The work is clean. The calls feel further away. You\'ve let a lot go.' };
-  }
-  if (native >= 6 && absFus <= 2) {
-    return { title: 'Untranslated',
-             body:  'The corridors are still noise. But home is still home. For now.' };
-  }
-  return { title: 'End of Week 1',
-           body:  'The semester continues. Four more weeks to figure this out.' };
-}
-
-function showEnd(title, body) {
-  document.getElementById('end-area').style.display = 'block';
-  document.getElementById('end-title').textContent = title;
-  document.getElementById('end-body').textContent  = body;
-}
-
-/* ═══════════════════════════════════════════════════════════
-   MODAL WIRING  (done once at startup)
-═══════════════════════════════════════════════════════════ */
-
-function wireModals() {
-  document.getElementById('synth-confirm').addEventListener('click', doConfirmSynth);
-  document.getElementById('synth-cancel').addEventListener('click', () => {
-    document.getElementById('modal-synth').classList.remove('open');
-  });
-}
-
-/* ═══════════════════════════════════════════════════════════
-   INIT
-═══════════════════════════════════════════════════════════ */
-
-function init() {
-  setLog(`Week 1 · Monday morning. This week's brief symbol: "${STATE.briefSymbol}". Go to class to start.`);
-  wireModals();
-  renderEnergy();
-  renderActions();
-  renderDeck();
-}
-
-init();
-</script>
-</body>
-</html>
-divLabel}`);
 
   // ── Feedback table (GDD §6.2) ──
   const FEEDBACK = {
