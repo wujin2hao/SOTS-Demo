@@ -101,7 +101,6 @@ body {
 .sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
 
 /* ── Deck ── */
-#deck-section {}
 #deck-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 #deck-hdr .area-title { margin-bottom: 0; }
 #deck-cap { font-size: .8rem; color: var(--dim); }
@@ -158,7 +157,7 @@ body {
 #end-area h2 { font-size: 1.6rem; color: var(--accent); margin-bottom: 10px; }
 #end-area p  { font-size: .95rem; color: var(--dim); max-width: 480px; margin: 0 auto 24px; line-height: 1.7; }
 
-/* ── Discard Modal ── */
+/* ── Modals (shared overlay) ── */
 .overlay {
   display: none; position: fixed; inset: 0;
   background: rgba(0,0,0,.72); z-index: 200;
@@ -172,7 +171,25 @@ body {
 }
 .modal-box h2 { font-size: 1rem; color: var(--accent); margin-bottom: 6px; }
 .modal-box p  { font-size: .85rem; color: var(--dim); margin-bottom: 16px; line-height: 1.5; }
+.modal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+/* ── Discard Modal ── */
 #discard-hint { font-size: .8rem; color: var(--dim); margin-top: 12px; }
+
+/* ── Synthesis Modal ── */
+#synth-columns {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;
+}
+.synth-col-label {
+  font-size: .73rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--dim); margin-bottom: 8px;
+}
+#synth-preview {
+  font-size: .85rem; color: var(--dim);
+  min-height: 22px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface2);
+}
+#synth-preview.ready { color: var(--accent); border-color: var(--accent); }
 
 /* ── Memory Flash ── */
 #mem-flash {
@@ -205,7 +222,7 @@ body {
   <!-- Action area (rebuilt each render) -->
   <div id="action-area"></div>
 
-  <!-- Homework (Day 7) -->
+  <!-- Homework (Day 5) -->
   <div id="hw-area">
     <div class="area-title">📐 Weekly Assignment — Due Today</div>
     <div id="hw-brief"></div>
@@ -236,7 +253,7 @@ body {
   <div id="deck-section">
     <div id="deck-hdr">
       <div class="area-title">Deck</div>
-      <span id="deck-cap">0 / 12</span>
+      <span id="deck-cap">0 / 10</span>
     </div>
     <div class="deck-grid" id="deck-grid"></div>
   </div>
@@ -246,10 +263,33 @@ body {
 <!-- Discard Modal -->
 <div class="overlay" id="modal-discard">
   <div class="modal-box">
-    <h2>Deck Full (12 / 12)</h2>
+    <h2>Deck Full (10 / 10)</h2>
     <p id="discard-prompt"></p>
     <div class="deck-grid" id="discard-grid"></div>
     <div id="discard-hint">↑ Click a card above to discard it and make room for the new card.</div>
+  </div>
+</div>
+
+<!-- Synthesis Modal -->
+<div class="overlay" id="modal-synth">
+  <div class="modal-box">
+    <h2>📐 Synthesize — Choose a Pair</h2>
+    <p>Select one abstract card and one concrete card. Any combination is valid. The fusion card inherits the abstract's theme tag and the concrete's memory.</p>
+    <div id="synth-columns">
+      <div>
+        <div class="synth-col-label">Abstract cards in deck</div>
+        <div class="deck-grid" id="synth-abstract-grid"></div>
+      </div>
+      <div>
+        <div class="synth-col-label">Concrete cards in deck</div>
+        <div class="deck-grid" id="synth-concrete-grid"></div>
+      </div>
+    </div>
+    <div id="synth-preview">Select one abstract and one concrete card to preview the fusion.</div>
+    <div class="modal-actions">
+      <button class="btn hi" id="synth-confirm" disabled>Fuse  (−5 energy)</button>
+      <button class="btn dim" id="synth-cancel">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -279,11 +319,9 @@ const ABSTRACT_POOL = [
   { sym:'◇', name:'Surface Reading' },
   { sym:'◻', name:'Formal Properties' },
   { sym:'⚪', name:'Spatial Logic' },
-  { sym:'△', name:'Abstracted Form' },
-  { sym:'◇', name:'Ambiguous Ground' },
 ];
 
-// 8 native concrete cards — starting deck
+// 8 native concrete cards — starting deck (capacity 10, so 2 empty slots)
 // tag = hidden theme symbol used in homework scoring
 const NATIVE_CARDS = [
   { id:'n1', type:'concrete', origin:'native', sym:'🍊', name:'外婆的厨房',     tag:'⚪', memory:'外婆把刚剥好的橘子塞进我手里，说"凉，你戴帽子"' },
@@ -319,18 +357,21 @@ const CONCRETE_POOLS = {
     { sym:'🪨', name:'Stones in the Water',  tag:'◇', memory:null },
   ],
   lawn: [
-    { sym:'👥', name:'Crowd on the Grass',       tag:'△', memory:null },
-    { sym:'🐕', name:'Old Man Walking His Dog',  tag:'⚪', memory:null },
-    { sym:'⚽', name:'Students Playing Football',tag:'◻', memory:null },
-    { sym:'🌸', name:'Blossoming Tree',          tag:'◇', memory:null },
+    { sym:'👥', name:'Crowd on the Grass',        tag:'△', memory:null },
+    { sym:'🐕', name:'Old Man Walking His Dog',   tag:'⚪', memory:null },
+    { sym:'⚽', name:'Students Playing Football', tag:'◻', memory:null },
+    { sym:'🌸', name:'Blossoming Tree',           tag:'◇', memory:null },
   ],
 };
 
-const DAY_NAMES = ['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const DAY_NAMES = ['','Mon','Tue','Wed','Thu','Fri'];
 
 /* ═══════════════════════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════════════════════ */
+
+const DECK_MAX = 10;
+const CYCLE_DAYS = 5;
 
 let _nextId = 200;
 const uid = () => `c${_nextId++}`;
@@ -341,11 +382,11 @@ const STATE = {
   classAttended: false,
   energy:        15,
 
-  // Deck: max 12 cards
+  // Deck: max DECK_MAX cards
   deck: NATIVE_CARDS.map(c => ({ ...c })),
 
   // Queue: cards waiting to be added (may need discard first)
-  pendingQueue:  [],   // [{card, label}]
+  pendingQueue:  [],
   queueRunning:  false,
 
   // Homework
@@ -397,7 +438,6 @@ function appendLog(t) { $log().textContent += ' ' + t; }
 ═══════════════════════════════════════════════════════════ */
 
 function enqueue(cards, onAllDone) {
-  // cards = array of card objects
   cards.forEach(c => STATE.pendingQueue.push(c));
   STATE._queueDone = onAllDone || null;
   drainQueue();
@@ -411,16 +451,15 @@ function drainQueue() {
   }
   STATE.queueRunning = true;
   const card = STATE.pendingQueue.shift();
-  if (STATE.deck.length < 12) {
+  if (STATE.deck.length < DECK_MAX) {
     STATE.deck.push(card);
     renderDeck();
     STATE.queueRunning = false;
     drainQueue();
   } else {
-    // Need to discard first — open modal, resume queue from discardCard()
     STATE._pendingNewCard = card;
     openDiscardModal(card);
-    // queueRunning stays true until discardCard() calls it
+    // queueRunning stays true until discardCard() resumes it
   }
 }
 
@@ -431,7 +470,7 @@ function drainQueue() {
 function openDiscardModal(newCard) {
   document.getElementById('discard-prompt').innerHTML =
     `New card incoming: <strong>${newCard.sym} ${newCard.name}</strong><br>
-     Your deck is at capacity. Choose one card to discard.`;
+     Your deck is at capacity (${DECK_MAX}/${DECK_MAX}). Choose one card to discard.`;
   renderDiscardGrid();
   document.getElementById('modal-discard').classList.add('open');
 }
@@ -455,7 +494,6 @@ function discardCard(id) {
   STATE._pendingNewCard = null;
 
   document.getElementById('modal-discard').classList.remove('open');
-
   STATE.deck.push(arrived);
   renderDeck();
   STATE.queueRunning = false;
@@ -470,6 +508,97 @@ function discardCard(id) {
   } else {
     afterDiscard();
   }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SYNTHESIS MODAL
+═══════════════════════════════════════════════════════════ */
+
+// Tracks which cards the player has selected in the synth modal
+let synthSel = { abstract: null, concrete: null };
+
+function openSynthModal() {
+  synthSel = { abstract: null, concrete: null };
+  renderSynthModal();
+  document.getElementById('modal-synth').classList.add('open');
+}
+
+function renderSynthModal() {
+  const aGrid = document.getElementById('synth-abstract-grid');
+  const cGrid = document.getElementById('synth-concrete-grid');
+  aGrid.innerHTML = '';
+  cGrid.innerHTML = '';
+
+  const abstracts = STATE.deck.filter(c => c.type === 'abstract');
+  const concretes = STATE.deck.filter(c => c.type === 'concrete');
+
+  abstracts.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (synthSel.abstract === card.id) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      synthSel.abstract = synthSel.abstract === card.id ? null : card.id;
+      renderSynthModal();
+    });
+    aGrid.appendChild(el);
+  });
+
+  concretes.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (synthSel.concrete === card.id) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      synthSel.concrete = synthSel.concrete === card.id ? null : card.id;
+      renderSynthModal();
+    });
+    cGrid.appendChild(el);
+  });
+
+  // Preview line + confirm button state
+  const preview    = document.getElementById('synth-preview');
+  const confirmBtn = document.getElementById('synth-confirm');
+
+  if (synthSel.abstract && synthSel.concrete) {
+    const a = STATE.deck.find(c => c.id === synthSel.abstract);
+    const b = STATE.deck.find(c => c.id === synthSel.concrete);
+    preview.textContent = `→ Fusion: "${b.name} / ${a.name}"  ·  tag: ${a.tag}  ·  ${b.memory ? 'carries memory' : 'no memory'}`;
+    preview.className = 'ready';
+    confirmBtn.disabled = false;
+  } else {
+    const hint = !synthSel.abstract && !synthSel.concrete ? 'Select one abstract and one concrete card to preview.'
+               : !synthSel.abstract ? '← Select an abstract card on the left.'
+               : 'Select a concrete card on the right →';
+    preview.textContent = hint;
+    preview.className = '';
+    confirmBtn.disabled = true;
+  }
+}
+
+function doConfirmSynth() {
+  if (!synthSel.abstract || !synthSel.concrete) return;
+  const a = STATE.deck.find(c => c.id === synthSel.abstract);
+  const b = STATE.deck.find(c => c.id === synthSel.concrete);
+  if (!a || !b) return;
+
+  spend(5);
+  // Remove both source cards before adding the fusion
+  STATE.deck = STATE.deck.filter(c => c.id !== a.id && c.id !== b.id);
+
+  const fusion = {
+    id:     uid(),
+    type:   'fusion',
+    origin: 'homework',
+    sym:    b.sym + '+' + a.sym,
+    name:   b.name + ' / ' + a.name,
+    tag:    a.tag,        // inherits abstract's theme tag
+    memory: b.memory || null,  // carries concrete's memory if any
+  };
+
+  document.getElementById('modal-synth').classList.remove('open');
+  setLog(`📐 Synthesized: "${b.name}" + "${a.name}"  →  Fusion card "${fusion.name}"`);
+  renderDeck();
+  renderHeader();
+  enqueue([fusion], () => renderActions());
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -545,15 +674,15 @@ function renderDeck() {
   });
 
   // Empty slots
-  for (let i = STATE.deck.length; i < 12; i++) {
+  for (let i = STATE.deck.length; i < DECK_MAX; i++) {
     const s = document.createElement('div');
     s.className = 'card empty';
     s.innerHTML = '<div class="c-sym" style="opacity:.2">—</div><div class="c-type">Empty</div>';
     grid.appendChild(s);
   }
 
-  cap.textContent = `${STATE.deck.length} / 12`;
-  cap.className = STATE.deck.length >= 12 ? 'full' : '';
+  cap.textContent = `${STATE.deck.length} / ${DECK_MAX}`;
+  cap.className = STATE.deck.length >= DECK_MAX ? 'full' : '';
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -573,7 +702,7 @@ function renderActions() {
   area.innerHTML = '';
   renderHeader();
 
-  if (STATE.phase === 'morning') buildMorningUI(area);
+  if (STATE.phase === 'morning')   buildMorningUI(area);
   else if (STATE.phase === 'afternoon') buildAfternoonUI(area);
 }
 
@@ -612,28 +741,31 @@ function buildAfternoonUI(area) {
   // Brief reminder pill
   const pill = document.createElement('div');
   pill.id = 'brief-pill';
-  if (STATE.day === 7) {
+  if (STATE.day === CYCLE_DAYS) {
     pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  <span style="color:var(--accent)">Homework due today — select 4 cards in deck below</span>`;
   } else {
-    pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  Assignment due Day 7`;
+    pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  Assignment due Day ${CYCLE_DAYS}`;
   }
   area.appendChild(pill);
 
   // Apartment
   const apt = makeLocSection('🏠  Apartment');
-  apt.appendChild(makeLocBtn('📞', 'Call Home',        'Telephone',  0, '+1 concrete card', doTelephone));
-  apt.appendChild(makeLocBtn('💻', 'Browse Internet',  'Internet',   2, '+1 concrete card', doInternet,  !hasEnergy(2)));
+  apt.appendChild(makeLocBtn('📞', 'Call Home',       'Telephone', 0, '+1 concrete card', doTelephone));
+  apt.appendChild(makeLocBtn('💻', 'Browse Internet', 'Internet',  2, '+1 concrete card', doInternet, !hasEnergy(2)));
+
   const canSynth = hasEnergy(5)
     && STATE.deck.some(c => c.type === 'abstract')
     && STATE.deck.some(c => c.type === 'concrete');
-  const synthNote = canSynth ? '+1 fusion card (auto-picks first match)' : 'needs 1 abstract + 1 concrete + 5 energy';
-  apt.appendChild(makeLocBtn('📐', 'Synthesize',       'Homework',   5, synthNote,           doSynthesize, !canSynth));
+  const synthNote = canSynth
+    ? '+1 fusion card (you choose the pair)'
+    : 'needs 1 abstract + 1 concrete + 5 energy';
+  apt.appendChild(makeLocBtn('📐', 'Synthesize', 'Homework', 5, synthNote, openSynthModal, !canSynth));
   area.appendChild(apt);
 
   // Park
   const park = makeLocSection('🌳  Park');
-  park.appendChild(makeLocBtn('🌊', 'Visit Lake',    'Park · Lake', 2, '+1 concrete card', doLake,  !hasEnergy(2)));
-  park.appendChild(makeLocBtn('🌿', 'Walk on Lawn',  'Park · Lawn', 2, '+1 concrete card', doLawn,  !hasEnergy(2)));
+  park.appendChild(makeLocBtn('🌊', 'Visit Lake',   'Park · Lake', 2, '+1 concrete card', doLake, !hasEnergy(2)));
+  park.appendChild(makeLocBtn('🌿', 'Walk on Lawn', 'Park · Lawn', 2, '+1 concrete card', doLawn, !hasEnergy(2)));
   area.appendChild(park);
 
   // Sleep button
@@ -642,7 +774,9 @@ function buildAfternoonUI(area) {
   sleepRow.style.marginTop = '14px';
   const sleepBtn = document.createElement('button');
   sleepBtn.className = 'btn dim';
-  sleepBtn.textContent = STATE.day >= 7 ? '🌙  End of Week' : `🌙  Sleep  →  Day ${STATE.day + 1}`;
+  sleepBtn.textContent = STATE.day >= CYCLE_DAYS
+    ? '🌙  End of Week'
+    : `🌙  Sleep  →  Day ${STATE.day + 1}`;
   sleepBtn.addEventListener('click', doSleep);
   sleepRow.appendChild(sleepBtn);
   area.appendChild(sleepRow);
@@ -658,7 +792,6 @@ function makeLocSection(title) {
   const grid = document.createElement('div');
   grid.className = 'loc-grid';
   sec.appendChild(grid);
-  // Attach grid ref so we can append buttons
   sec._grid = grid;
   sec.appendChild = (el) => {
     if (el.classList && el.classList.contains('loc-btn')) sec._grid.appendChild(el);
@@ -693,7 +826,7 @@ function doClass() {
 
   enqueue(cards, () => {
     STATE.phase = 'afternoon';
-    if (STATE.day === 7) showHomework();
+    if (STATE.day === CYCLE_DAYS) showHomework();
     renderActions();
   });
 }
@@ -712,32 +845,6 @@ function doInternet() {
   const card = pickConcrete('internet');
   setLog(`💻 Browsed online.  →  ${card.sym} ${card.name}`);
   enqueue([card], () => renderActions());
-}
-
-function doSynthesize() {
-  if (!hasEnergy(5)) return;
-  const a = STATE.deck.find(c => c.type === 'abstract');
-  const b = STATE.deck.find(c => c.type === 'concrete');
-  if (!a || !b) return;
-
-  spend(5);
-  // Remove source cards from deck
-  STATE.deck = STATE.deck.filter(c => c.id !== a.id && c.id !== b.id);
-
-  const fusion = {
-    id:     uid(),
-    type:   'fusion',
-    origin: 'homework',
-    sym:    b.sym + '+' + a.sym,
-    name:   b.name + ' / ' + a.name,
-    tag:    a.tag,   // fusion inherits abstract's theme tag
-    memory: b.memory || null,
-  };
-
-  setLog(`📐 Synthesized: "${b.name}" + "${a.name}"  →  Fusion card "${fusion.name}"`);
-  renderDeck();
-  renderHeader();
-  enqueue([fusion], () => renderActions());
 }
 
 function doLake() {
@@ -759,7 +866,7 @@ function doLawn() {
 }
 
 function doSleep() {
-  if (STATE.day >= 7) {
+  if (STATE.day >= CYCLE_DAYS) {
     STATE.phase = 'done';
     setLog('Week over.');
     renderActions();
@@ -767,9 +874,9 @@ function doSleep() {
     return;
   }
   STATE.day++;
-  STATE.energy       = 15;
+  STATE.energy        = 15;
   STATE.classAttended = false;
-  STATE.phase        = 'morning';
+  STATE.phase         = 'morning';
   setLog(`Day ${STATE.day}. New day.`);
   renderActions();
   renderDeck();
@@ -834,7 +941,6 @@ function submitHomework() {
   const brief = STATE.briefSymbol;
 
   // ── A. Theme Match ──
-  // Each card: abstract → tag === brief; concrete → tag === brief; fusion → tag === brief (inherited from abstract)
   let hits = 0;
   const judgeLines = [];
   selected.forEach(card => {
@@ -849,18 +955,18 @@ function submitHomework() {
 
   // ── B. Diversity ──
   // Fusion counts as BOTH abstract and concrete (GDD §6.2)
-  // BUT 4 fusion = single type (still penalised)
+  // BUT 4 fusion = single type → penalised
   const allFusion = selected.every(c => c.type === 'fusion');
   const typeSet = new Set();
   selected.forEach(c => {
     if (c.type === 'fusion') { typeSet.add('abstract'); typeSet.add('concrete'); }
     else typeSet.add(c.type);
   });
-  let diversity = allFusion ? 1 : typeSet.size;  // 1 low / 2 medium / 3 high
-  const divLabel = diversity >= 3 ? 'high' : diversity === 2 ? 'medium' : 'low';
-  console.log(`[Homework] Types: ${[...typeSet].join('+')}${allFusion?' (all-fusion penalty)':''} → diversity: ${divLabel}`);
+  const diversity = allFusion ? 1 : typeSet.size;
+  const divLabel  = diversity >= 3 ? 'high' : diversity === 2 ? 'medium' : 'low';
+  console.log(`[Homework] Types: ${[...typeSet].join('+')}${allFusion ? ' (all-fusion penalty)' : ''} → diversity: ${divLabel}`);
 
-  // ── Feedback table (mirrors GDD §6.2 examples) ──
+  // ── Feedback table (GDD §6.2) ──
   const FEEDBACK = {
     'fail-low':    { grade:'D',  quote:'"I don\'t see how this engages with the brief."' },
     'fail-medium': { grade:'C',  quote:'"Some engagement, but where\'s the brief in this?"' },
@@ -869,14 +975,12 @@ function submitHomework() {
     'pass-medium': { grade:'B',  quote:'"Some engagement, but feels collaged."' },
     'pass-high':   { grade:'A',  quote:'"A clear voice working through the brief. This is the work."' },
   };
-  // Special overrides from GDD table
-  // "4 fusion" → "Strong voice but underdeveloped"
-  const key = allFusion ? 'pass-low-fusion' : `${themePass ? 'pass' : 'fail'}-${divLabel}`;
-  const fb = allFusion
+  const key = `${themePass ? 'pass' : 'fail'}-${divLabel}`;
+  const fb  = allFusion
     ? { grade:'B-', quote:'"Strong voice but underdeveloped — where\'s the rigor?"' }
     : (FEEDBACK[key] || { grade:'C', quote:'"Submission received."' });
 
-  console.log(`[Homework] Key: ${key} → Grade: ${fb.grade}`);
+  console.log(`[Homework] Key: ${allFusion ? 'all-fusion' : key} → Grade: ${fb.grade}`);
 
   // ── Show feedback ──
   STATE.hwActive = false;
@@ -910,32 +1014,24 @@ function submitHomework() {
 ═══════════════════════════════════════════════════════════ */
 
 function getEnding() {
-  const native  = STATE.deck.filter(c => c.origin === 'native').length;
-  const fusion  = STATE.deck.filter(c => c.type === 'fusion').length;
-  const absFus  = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
+  const native = STATE.deck.filter(c => c.origin === 'native').length;
+  const fusion = STATE.deck.filter(c => c.type === 'fusion').length;
+  const absFus = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
 
   if (fusion >= 3) {
-    return {
-      title: 'Fluent in Two Tongues',
-      body: 'Neither fully here nor there. Both. It\'s exhausting. It\'s yours.',
-    };
+    return { title: 'Fluent in Two Tongues',
+             body:  'Neither fully here nor there. Both. It\'s exhausting. It\'s yours.' };
   }
   if (native <= 2 && fusion === 0) {
-    return {
-      title: 'Clean Slate',
-      body: 'The work is clean. The calls feel further away. You\'ve let a lot go.',
-    };
+    return { title: 'Clean Slate',
+             body:  'The work is clean. The calls feel further away. You\'ve let a lot go.' };
   }
   if (native >= 6 && absFus <= 2) {
-    return {
-      title: 'Untranslated',
-      body: 'The corridors are still noise. But home is still home. For now.',
-    };
+    return { title: 'Untranslated',
+             body:  'The corridors are still noise. But home is still home. For now.' };
   }
-  return {
-    title: 'End of Week 1',
-    body:  'The semester continues. Seven more weeks to figure this out.',
-  };
+  return { title: 'End of Week 1',
+           body:  'The semester continues. Four more weeks to figure this out.' };
 }
 
 function showEnd(title, body) {
@@ -945,11 +1041,126 @@ function showEnd(title, body) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   MODAL WIRING  (done once at startup)
+═══════════════════════════════════════════════════════════ */
+
+function wireModals() {
+  document.getElementById('synth-confirm').addEventListener('click', doConfirmSynth);
+  document.getElementById('synth-cancel').addEventListener('click', () => {
+    document.getElementById('modal-synth').classList.remove('open');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════════ */
 
 function init() {
   setLog(`Week 1 · Monday morning. This week's brief symbol: "${STATE.briefSymbol}". Go to class to start.`);
+  wireModals();
+  renderEnergy();
+  renderActions();
+  renderDeck();
+}
+
+init();
+</script>
+</body>
+</html>
+divLabel}`);
+
+  // ── Feedback table (GDD §6.2) ──
+  const FEEDBACK = {
+    'fail-low':    { grade:'D',  quote:'"I don\'t see how this engages with the brief."' },
+    'fail-medium': { grade:'C',  quote:'"Some engagement, but where\'s the brief in this?"' },
+    'fail-high':   { grade:'C+', quote:'"Rich vocabulary, but you didn\'t answer the question."' },
+    'pass-low':    { grade:'B-', quote:'"Technically on-brief, but where\'s the work?"' },
+    'pass-medium': { grade:'B',  quote:'"Some engagement, but feels collaged."' },
+    'pass-high':   { grade:'A',  quote:'"A clear voice working through the brief. This is the work."' },
+  };
+  const key = `${themePass ? 'pass' : 'fail'}-${divLabel}`;
+  const fb  = allFusion
+    ? { grade:'B-', quote:'"Strong voice but underdeveloped — where\'s the rigor?"' }
+    : (FEEDBACK[key] || { grade:'C', quote:'"Submission received."' });
+
+  console.log(`[Homework] Key: ${allFusion ? 'all-fusion' : key} → Grade: ${fb.grade}`);
+
+  // ── Show feedback ──
+  STATE.hwActive = false;
+  STATE.phase = 'done';
+  document.getElementById('hw-area').style.display = 'none';
+  document.getElementById('action-area').innerHTML = '';
+  renderDeck();
+
+  const fbArea = document.getElementById('fb-area');
+  fbArea.style.display = 'block';
+  document.getElementById('fb-grade').textContent = `Grade: ${fb.grade}`;
+  document.getElementById('fb-quote').textContent = fb.quote;
+  document.getElementById('fb-detail').textContent = [
+    `Brief: "${brief}"`,
+    `Theme match: ${hits}/4 cards on-brief  →  ${themePass ? 'PASSED' : 'FAILED'}`,
+    `Diversity: ${[...typeSet].join(' + ')}${allFusion ? '  (all-fusion — penalised)' : ''}  →  ${divLabel}`,
+    '',
+    'Per-card:',
+    ...judgeLines,
+  ].join('\n');
+
+  document.getElementById('fb-next').onclick = () => {
+    fbArea.style.display = 'none';
+    const { title, body } = getEnding();
+    showEnd(title, body);
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ENDING  (GDD §7)
+═══════════════════════════════════════════════════════════ */
+
+function getEnding() {
+  const native = STATE.deck.filter(c => c.origin === 'native').length;
+  const fusion = STATE.deck.filter(c => c.type === 'fusion').length;
+  const absFus = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
+
+  if (fusion >= 3) {
+    return { title: 'Fluent in Two Tongues',
+             body:  'Neither fully here nor there. Both. It\'s exhausting. It\'s yours.' };
+  }
+  if (native <= 2 && fusion === 0) {
+    return { title: 'Clean Slate',
+             body:  'The work is clean. The calls feel further away. You\'ve let a lot go.' };
+  }
+  if (native >= 6 && absFus <= 2) {
+    return { title: 'Untranslated',
+             body:  'The corridors are still noise. But home is still home. For now.' };
+  }
+  return { title: 'End of Week 1',
+           body:  'The semester continues. Four more weeks to figure this out.' };
+}
+
+function showEnd(title, body) {
+  document.getElementById('end-area').style.display = 'block';
+  document.getElementById('end-title').textContent = title;
+  document.getElementById('end-body').textContent  = body;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL WIRING  (done once at startup)
+═══════════════════════════════════════════════════════════ */
+
+function wireModals() {
+  document.getElementById('synth-confirm').addEventListener('click', doConfirmSynth);
+  document.getElementById('synth-cancel').addEventListener('click', () => {
+    document.getElementById('modal-synth').classList.remove('open');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+
+function init() {
+  setLog(`Week 1 · Monday morning. This week's brief symbol: "${STATE.briefSymbol}". Go to class to start.`);
+  wireModals();
   renderEnergy();
   renderActions();
   renderDeck();
