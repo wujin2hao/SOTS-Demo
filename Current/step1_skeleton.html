@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Static &amp; Signal — Step 1 Skeleton</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #0a0a10;
+  --surface:   #141420;
+  --surface2:  #1c1c2a;
+  --border:    #2e2e42;
+  --border-hi: #4a4a68;
+  --text:      #e6e0d0;
+  --dim:       #6a6a88;
+  --accent:    #c8a878;
+  --green:     #5ecf90;
+  --red:       #e85050;
+  --blue:      #5ecfc0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+}
+#app { max-width: 860px; margin: 0 auto; padding: 24px 20px 60px; }
+
+/* ── Header ── */
+#hdr {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+#day-label  { font-size: 1.05rem; font-weight: 600; color: var(--accent); min-width: 110px; }
+#phase-tag  { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); }
+#energy-row { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.edot       { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.edot.spent { background: var(--border); }
+#energy-num { font-size: .8rem; color: var(--dim); margin-left: 4px; }
+
+/* ── Log ── */
+#log {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 9px 14px; margin-bottom: 18px;
+  font-size: .875rem; color: var(--dim); line-height: 1.55; min-height: 40px;
+}
+
+/* ── Action area ── */
+#action-area { margin-bottom: 22px; }
+.area-title {
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim); margin-bottom: 10px;
+}
+.btn-row { display: flex; flex-wrap: wrap; gap: 9px; }
+
+/* ── Generic buttons ── */
+.btn {
+  padding: 8px 18px; border: 1px solid var(--border-hi);
+  background: transparent; color: var(--text); cursor: pointer;
+  border-radius: 4px; font-size: .875rem;
+  transition: background .13s, border-color .13s;
+}
+.btn:hover:not(:disabled) { background: rgba(255,255,255,.05); border-color: var(--accent); }
+.btn:disabled  { opacity: .32; cursor: not-allowed; }
+.btn.hi        { border-color: var(--accent); color: var(--accent); }
+.btn.hi:hover:not(:disabled) { background: rgba(200,168,120,.1); }
+.btn.dim       { border-color: var(--dim); color: var(--dim); }
+.btn.dim:hover:not(:disabled) { border-color: var(--text); color: var(--text); background: rgba(255,255,255,.03); }
+
+/* ── Location buttons ── */
+.loc-section { margin-bottom: 14px; }
+.loc-section-label { font-size: .73rem; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin-bottom: 6px; }
+.loc-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.loc-btn {
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 10px 14px; min-width: 150px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); cursor: pointer; border-radius: 6px;
+  font-size: .875rem; text-align: left;
+  transition: border-color .13s, background .13s;
+}
+.loc-btn:hover:not(:disabled) { border-color: var(--border-hi); background: var(--surface2); }
+.loc-btn:disabled { opacity: .32; cursor: not-allowed; }
+.loc-btn .li { font-size: 1.15rem; margin-bottom: 3px; }
+.loc-btn .ln { font-weight: 500; }
+.loc-btn .lc { font-size: .73rem; color: var(--dim); margin-top: 1px; }
+.loc-btn .ly { font-size: .73rem; color: var(--green); margin-top: 1px; }
+
+/* ── Brief pill ── */
+#brief-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 14px; font-size: .83rem;
+  margin-bottom: 14px; color: var(--dim);
+}
+#brief-pill strong { color: var(--accent); font-size: 1.1rem; }
+
+/* ── Separator ── */
+.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Deck ── */
+#deck-section {}
+#deck-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#deck-hdr .area-title { margin-bottom: 0; }
+#deck-cap { font-size: .8rem; color: var(--dim); }
+#deck-cap.full { color: var(--red); }
+.deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+
+/* ── Cards ── */
+.card {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px; background: var(--surface); position: relative;
+}
+.card.native   { border-color: #3a3050; }
+.card.abstract { border-color: #2a3a50; }
+.card.fusion   { border-color: #3a4a2a; border-width: 2px; }
+.card.empty    { border-style: dashed; background: transparent; opacity: .35; }
+.card.selectable { cursor: pointer; transition: border-color .13s, background .13s; }
+.card.selectable:hover { border-color: var(--accent); background: var(--surface2); }
+.card.selected { border-color: var(--accent); background: rgba(200,168,120,.07); box-shadow: 0 0 0 1px var(--accent); }
+.card .c-sym  { font-size: 1.3rem; margin-bottom: 3px; }
+.card .c-name { font-size: .78rem; font-weight: 600; line-height: 1.3; margin-bottom: 2px; }
+.card .c-type { font-size: .67rem; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); }
+.card .c-tag  { font-size: .72rem; color: var(--dim); margin-top: 3px; }
+.card .c-mem  { font-size: .7rem; color: var(--dim); margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border); line-height: 1.4; }
+
+/* ── Homework ── */
+#hw-area { display: none; margin-bottom: 20px; }
+#hw-brief { margin-bottom: 10px; }
+#hw-brief .sym { font-size: 2rem; color: var(--accent); }
+.hw-info { font-size: .83rem; color: var(--dim); margin-bottom: 10px; }
+#hw-selection {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  min-height: 38px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); margin-bottom: 12px;
+}
+.hw-tag {
+  background: var(--surface2); border: 1px solid var(--border-hi);
+  border-radius: 3px; padding: 3px 8px; font-size: .78rem;
+}
+
+/* ── Feedback ── */
+#fb-area { display: none; margin-bottom: 20px; }
+.fb-grade { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.fb-quote { font-size: .95rem; line-height: 1.7; margin-bottom: 14px; color: var(--text); font-style: italic; }
+.fb-detail {
+  font-size: .8rem; line-height: 1.65; color: var(--dim);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;
+  white-space: pre-wrap; font-family: 'Courier New', monospace;
+}
+
+/* ── End ── */
+#end-area { display: none; text-align: center; padding: 48px 20px; }
+#end-area h2 { font-size: 1.6rem; color: var(--accent); margin-bottom: 10px; }
+#end-area p  { font-size: .95rem; color: var(--dim); max-width: 480px; margin: 0 auto 24px; line-height: 1.7; }
+
+/* ── Discard Modal ── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.72); z-index: 200;
+  overflow-y: auto; padding: 40px 20px;
+  align-items: flex-start; justify-content: center;
+}
+.overlay.open { display: flex; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border-hi);
+  border-radius: 10px; padding: 26px; max-width: 740px; width: 100%;
+}
+.modal-box h2 { font-size: 1rem; color: var(--accent); margin-bottom: 6px; }
+.modal-box p  { font-size: .85rem; color: var(--dim); margin-bottom: 16px; line-height: 1.5; }
+#discard-hint { font-size: .8rem; color: var(--dim); margin-top: 12px; }
+
+/* ── Memory Flash ── */
+#mem-flash {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.88);
+  align-items: center; justify-content: center; text-align: center;
+  padding: 40px;
+}
+#mem-flash.open { display: flex; }
+#mem-flash p {
+  font-size: 1.1rem; color: var(--text); max-width: 480px;
+  line-height: 1.7; font-family: Georgia, serif; font-style: italic;
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="hdr">
+    <span id="day-label">Day 1 · Mon</span>
+    <span id="phase-tag">Morning</span>
+    <div id="energy-row"></div>
+    <span id="energy-num"></span>
+  </div>
+
+  <!-- Log line -->
+  <div id="log"></div>
+
+  <!-- Action area (rebuilt each render) -->
+  <div id="action-area"></div>
+
+  <!-- Homework (Day 7) -->
+  <div id="hw-area">
+    <div class="area-title">📐 Weekly Assignment — Due Today</div>
+    <div id="hw-brief"></div>
+    <div class="hw-info" id="hw-info">Select 4 cards from your deck below.</div>
+    <div id="hw-selection"><span style="color:var(--dim);font-size:.82rem">No cards selected</span></div>
+    <button class="btn hi" id="hw-submit" disabled>Submit Assignment</button>
+  </div>
+
+  <!-- Feedback -->
+  <div id="fb-area">
+    <div class="area-title">Dr. Hollow's Feedback</div>
+    <div class="fb-grade" id="fb-grade"></div>
+    <div class="fb-quote" id="fb-quote"></div>
+    <div class="fb-detail" id="fb-detail"></div>
+    <button class="btn" id="fb-next">Continue →</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="end-area">
+    <h2 id="end-title">End of Week</h2>
+    <p  id="end-body"></p>
+    <button class="btn hi" onclick="location.reload()">↺  Start Over</button>
+  </div>
+
+  <hr class="sep">
+
+  <!-- Deck -->
+  <div id="deck-section">
+    <div id="deck-hdr">
+      <div class="area-title">Deck</div>
+      <span id="deck-cap">0 / 12</span>
+    </div>
+    <div class="deck-grid" id="deck-grid"></div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Discard Modal -->
+<div class="overlay" id="modal-discard">
+  <div class="modal-box">
+    <h2>Deck Full (12 / 12)</h2>
+    <p id="discard-prompt"></p>
+    <div class="deck-grid" id="discard-grid"></div>
+    <div id="discard-hint">↑ Click a card above to discard it and make room for the new card.</div>
+  </div>
+</div>
+
+<!-- Memory Flash -->
+<div id="mem-flash">
+  <p id="mem-text"></p>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════════════ */
+
+const SYMBOLS = ['◻','⚪','△','◇'];
+
+// Abstract card pool — drawn during class
+const ABSTRACT_POOL = [
+  { sym:'◻', name:'Compositional Logic' },
+  { sym:'⚪', name:'Negative Space' },
+  { sym:'△', name:'Material Tension' },
+  { sym:'◇', name:'Frame and Field' },
+  { sym:'◻', name:'Iteration' },
+  { sym:'⚪', name:'Critical Distance' },
+  { sym:'△', name:'Picture Plane' },
+  { sym:'◇', name:'Surface Reading' },
+  { sym:'◻', name:'Formal Properties' },
+  { sym:'⚪', name:'Spatial Logic' },
+  { sym:'△', name:'Abstracted Form' },
+  { sym:'◇', name:'Ambiguous Ground' },
+];
+
+// 8 native concrete cards — starting deck
+// tag = hidden theme symbol used in homework scoring
+const NATIVE_CARDS = [
+  { id:'n1', type:'concrete', origin:'native', sym:'🍊', name:'外婆的厨房',     tag:'⚪', memory:'外婆把刚剥好的橘子塞进我手里，说"凉，你戴帽子"' },
+  { id:'n2', type:'concrete', origin:'native', sym:'🌧', name:'雨夜回家',       tag:'△', memory:'巷子湿，路灯黄，钥匙转了三下才进对孔' },
+  { id:'n3', type:'concrete', origin:'native', sym:'📖', name:'旧课本边角',     tag:'◻', memory:'高一数学第43页画了一只翅膀坏掉的鸟' },
+  { id:'n4', type:'concrete', origin:'native', sym:'🧧', name:'春节的红包',     tag:'◇', memory:'压岁钱被妈妈收走，半夜又偷偷塞回我枕头底下' },
+  { id:'n5', type:'concrete', origin:'native', sym:'🍬', name:'楼下小卖部',     tag:'⚪', memory:'一块钱三颗的水果糖，糖纸我留了一抽屉' },
+  { id:'n6', type:'concrete', origin:'native', sym:'💬', name:'方言口头禅',     tag:'△', memory:'外婆说"莫法"——这个词在普通话里没有完全对应的翻译' },
+  { id:'n7', type:'concrete', origin:'native', sym:'💡', name:'高考前夜的台灯', tag:'◻', memory:'凌晨两点台灯下，最后一道压轴题画了三遍辅助线' },
+  { id:'n8', type:'concrete', origin:'native', sym:'🚂', name:'第一次坐火车',   tag:'◇', memory:'窗外的田后退得比我想象的快' },
+];
+
+// Location-specific concrete card pools
+const CONCRETE_POOLS = {
+  telephone: [
+    { sym:'📞', name:'妈妈的声音',   tag:'⚪', memory:'她说最近变冷了，让你多穿点' },
+    { sym:'🏠', name:'家里的猫',     tag:'△', memory:'爸说猫最近老蹲在你房间门口' },
+    { sym:'🍜', name:'周末的饭桌',   tag:'⚪', memory:'外婆做了你最喜欢的糖醋排骨' },
+    { sym:'📮', name:'寄来的包裹',   tag:'◻', memory:'妈说寄了秋衣，应该这两天到' },
+    { sym:'📸', name:'家里的老照片', tag:'◇', memory:'妈翻到了你小学毕业照，说你那时候留着刘海' },
+  ],
+  internet: [
+    { sym:'🔗', name:'Algorithm Feed',         tag:'◻', memory:null },
+    { sym:'📱', name:'Random Short Video',      tag:'⚪', memory:null },
+    { sym:'🖼', name:'Reference Image',         tag:'△', memory:null },
+    { sym:'💬', name:'Forum Stranger',          tag:'◇', memory:null },
+    { sym:'🌐', name:'Wikipedia Rabbit Hole',   tag:'◻', memory:null },
+  ],
+  lake: [
+    { sym:'🌊', name:'Light on the Lake',    tag:'◻', memory:null },
+    { sym:'🦆', name:'Ducks at the Margin',  tag:'⚪', memory:null },
+    { sym:'🌿', name:'Grass at the Bank',    tag:'△', memory:null },
+    { sym:'🪨', name:'Stones in the Water',  tag:'◇', memory:null },
+  ],
+  lawn: [
+    { sym:'👥', name:'Crowd on the Grass',       tag:'△', memory:null },
+    { sym:'🐕', name:'Old Man Walking His Dog',  tag:'⚪', memory:null },
+    { sym:'⚽', name:'Students Playing Football',tag:'◻', memory:null },
+    { sym:'🌸', name:'Blossoming Tree',          tag:'◇', memory:null },
+  ],
+};
+
+const DAY_NAMES = ['','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════ */
+
+let _nextId = 200;
+const uid = () => `c${_nextId++}`;
+
+const STATE = {
+  day:           1,
+  phase:         'morning',  // 'morning' | 'afternoon' | 'done'
+  classAttended: false,
+  energy:        15,
+
+  // Deck: max 12 cards
+  deck: NATIVE_CARDS.map(c => ({ ...c })),
+
+  // Queue: cards waiting to be added (may need discard first)
+  pendingQueue:  [],   // [{card, label}]
+  queueRunning:  false,
+
+  // Homework
+  hwActive:      false,
+  hwSelected:    [],   // card ids
+  briefSymbol:   SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
+
+  // Prevent re-use of same abstract / concrete cards too quickly
+  usedAbstract:  new Set(),
+  usedConcrete:  { telephone:[], internet:[], lake:[], lawn:[] },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════ */
+
+function rand(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickAbstract() {
+  const unused = ABSTRACT_POOL.filter((_, i) => !STATE.usedAbstract.has(i));
+  const pool = unused.length ? unused : ABSTRACT_POOL;
+  const i = Math.floor(Math.random() * pool.length);
+  const t = pool[i];
+  STATE.usedAbstract.add(ABSTRACT_POOL.indexOf(t));
+  return { id: uid(), type:'abstract', origin:'class', sym: t.sym, name: t.name, tag: t.sym, memory: null };
+}
+
+function pickConcrete(src) {
+  const pool = CONCRETE_POOLS[src];
+  const used = STATE.usedConcrete[src];
+  const fresh = pool.filter(c => !used.includes(c.name));
+  const t = fresh.length ? rand(fresh) : rand(pool);
+  STATE.usedConcrete[src].push(t.name);
+  return { id: uid(), type:'concrete', origin: src, sym: t.sym, name: t.name, tag: t.tag, memory: t.memory };
+}
+
+function hasEnergy(n) { return STATE.energy >= n; }
+function spend(n)     { STATE.energy = Math.max(0, STATE.energy - n); }
+
+const $log = () => document.getElementById('log');
+function setLog(t)    { $log().textContent = t; }
+function appendLog(t) { $log().textContent += ' ' + t; }
+
+/* ═══════════════════════════════════════════════════════════
+   CARD QUEUE — serialises adding cards even when discard modal
+   must interrupt in the middle of a batch (e.g. 5 class cards)
+═══════════════════════════════════════════════════════════ */
+
+function enqueue(cards, onAllDone) {
+  // cards = array of card objects
+  cards.forEach(c => STATE.pendingQueue.push(c));
+  STATE._queueDone = onAllDone || null;
+  drainQueue();
+}
+
+function drainQueue() {
+  if (STATE.queueRunning) return;
+  if (!STATE.pendingQueue.length) {
+    if (STATE._queueDone) { const fn = STATE._queueDone; STATE._queueDone = null; fn(); }
+    return;
+  }
+  STATE.queueRunning = true;
+  const card = STATE.pendingQueue.shift();
+  if (STATE.deck.length < 12) {
+    STATE.deck.push(card);
+    renderDeck();
+    STATE.queueRunning = false;
+    drainQueue();
+  } else {
+    // Need to discard first — open modal, resume queue from discardCard()
+    STATE._pendingNewCard = card;
+    openDiscardModal(card);
+    // queueRunning stays true until discardCard() calls it
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DISCARD MODAL
+═══════════════════════════════════════════════════════════ */
+
+function openDiscardModal(newCard) {
+  document.getElementById('discard-prompt').innerHTML =
+    `New card incoming: <strong>${newCard.sym} ${newCard.name}</strong><br>
+     Your deck is at capacity. Choose one card to discard.`;
+  renderDiscardGrid();
+  document.getElementById('modal-discard').classList.add('open');
+}
+
+function renderDiscardGrid() {
+  const grid = document.getElementById('discard-grid');
+  grid.innerHTML = '';
+  STATE.deck.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    el.addEventListener('click', () => discardCard(card.id));
+    grid.appendChild(el);
+  });
+}
+
+function discardCard(id) {
+  const idx = STATE.deck.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  const gone = STATE.deck.splice(idx, 1)[0];
+  const arrived = STATE._pendingNewCard;
+  STATE._pendingNewCard = null;
+
+  document.getElementById('modal-discard').classList.remove('open');
+
+  STATE.deck.push(arrived);
+  renderDeck();
+  STATE.queueRunning = false;
+
+  const afterDiscard = () => {
+    appendLog(`Discarded "${gone.name}". Added "${arrived.sym} ${arrived.name}".`);
+    drainQueue();
+  };
+
+  if (gone.origin === 'native' && gone.memory) {
+    flashMemory(gone.memory, afterDiscard);
+  } else {
+    afterDiscard();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MEMORY FLASH
+═══════════════════════════════════════════════════════════ */
+
+function flashMemory(text, cb) {
+  const el = document.getElementById('mem-flash');
+  document.getElementById('mem-text').textContent = `"${text}"`;
+  el.classList.add('open');
+  setTimeout(() => {
+    el.classList.remove('open');
+    if (cb) cb();
+  }, 2000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER — ENERGY BAR
+═══════════════════════════════════════════════════════════ */
+
+function renderEnergy() {
+  const row = document.getElementById('energy-row');
+  const num = document.getElementById('energy-num');
+  row.innerHTML = '';
+  for (let i = 0; i < 15; i++) {
+    const d = document.createElement('div');
+    d.className = 'edot' + (i >= STATE.energy ? ' spent' : '');
+    row.appendChild(d);
+  }
+  num.textContent = `${STATE.energy} / 15`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER — DECK
+═══════════════════════════════════════════════════════════ */
+
+function makeCardEl(card) {
+  const ORIGIN_LABEL = {
+    native:'母语', class:'Lecture', telephone:'Telephone',
+    internet:'Internet', lake:'Park·Lake', lawn:'Park·Lawn', homework:'Synthesis',
+  };
+  const div = document.createElement('div');
+  let cls = 'card';
+  if (card.origin === 'native') cls += ' native';
+  else if (card.type === 'abstract') cls += ' abstract';
+  else if (card.type === 'fusion')   cls += ' fusion';
+  div.className = cls;
+  div.dataset.id = card.id;
+
+  div.innerHTML =
+    `<div class="c-sym">${card.sym}</div>` +
+    `<div class="c-name">${card.name}</div>` +
+    `<div class="c-type">${card.type} · ${ORIGIN_LABEL[card.origin] || card.origin}</div>` +
+    `<div class="c-tag">tag: ${card.tag}</div>` +
+    (card.memory ? `<div class="c-mem">${card.memory}</div>` : '');
+
+  return div;
+}
+
+function renderDeck() {
+  const grid = document.getElementById('deck-grid');
+  const cap  = document.getElementById('deck-cap');
+  grid.innerHTML = '';
+
+  STATE.deck.forEach(card => {
+    const el = makeCardEl(card);
+    if (STATE.hwActive) {
+      el.classList.add('selectable');
+      if (STATE.hwSelected.includes(card.id)) el.classList.add('selected');
+      el.addEventListener('click', () => toggleHwCard(card.id));
+    }
+    grid.appendChild(el);
+  });
+
+  // Empty slots
+  for (let i = STATE.deck.length; i < 12; i++) {
+    const s = document.createElement('div');
+    s.className = 'card empty';
+    s.innerHTML = '<div class="c-sym" style="opacity:.2">—</div><div class="c-type">Empty</div>';
+    grid.appendChild(s);
+  }
+
+  cap.textContent = `${STATE.deck.length} / 12`;
+  cap.className = STATE.deck.length >= 12 ? 'full' : '';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER — HEADER + ACTIONS
+═══════════════════════════════════════════════════════════ */
+
+function renderHeader() {
+  document.getElementById('day-label').textContent =
+    `Day ${STATE.day} · ${DAY_NAMES[STATE.day] || ''}`;
+  const phaseNames = { morning:'Morning', afternoon:'Afternoon', done:'—' };
+  document.getElementById('phase-tag').textContent = phaseNames[STATE.phase] || STATE.phase;
+  renderEnergy();
+}
+
+function renderActions() {
+  const area = document.getElementById('action-area');
+  area.innerHTML = '';
+  renderHeader();
+
+  if (STATE.phase === 'morning') buildMorningUI(area);
+  else if (STATE.phase === 'afternoon') buildAfternoonUI(area);
+}
+
+/* ── Morning UI ── */
+function buildMorningUI(area) {
+  const title = document.createElement('div');
+  title.className = 'area-title';
+  title.textContent = '09:00  —  Morning';
+  area.appendChild(title);
+
+  const row = document.createElement('div');
+  row.className = 'btn-row';
+
+  if (!STATE.classAttended) {
+    const btn = document.createElement('button');
+    btn.className = 'btn hi';
+    btn.textContent = '🎓  Go to Class  (−3 energy)';
+    btn.addEventListener('click', doClass);
+    const note = document.createElement('span');
+    note.style.cssText = 'font-size:.8rem;color:var(--dim);align-self:center;';
+    note.textContent = 'Mandatory. Captures 5 lecture fragments automatically.';
+    row.appendChild(btn);
+    row.appendChild(note);
+  } else {
+    const note = document.createElement('p');
+    note.style.cssText = 'font-size:.85rem;color:var(--dim);';
+    note.textContent = 'Class done. Afternoon is open.';
+    area.appendChild(note);
+  }
+
+  area.appendChild(row);
+}
+
+/* ── Afternoon UI ── */
+function buildAfternoonUI(area) {
+  // Brief reminder pill
+  const pill = document.createElement('div');
+  pill.id = 'brief-pill';
+  if (STATE.day === 7) {
+    pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  <span style="color:var(--accent)">Homework due today — select 4 cards in deck below</span>`;
+  } else {
+    pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  Assignment due Day 7`;
+  }
+  area.appendChild(pill);
+
+  // Apartment
+  const apt = makeLocSection('🏠  Apartment');
+  apt.appendChild(makeLocBtn('📞', 'Call Home',        'Telephone',  0, '+1 concrete card', doTelephone));
+  apt.appendChild(makeLocBtn('💻', 'Browse Internet',  'Internet',   2, '+1 concrete card', doInternet,  !hasEnergy(2)));
+  const canSynth = hasEnergy(5)
+    && STATE.deck.some(c => c.type === 'abstract')
+    && STATE.deck.some(c => c.type === 'concrete');
+  const synthNote = canSynth ? '+1 fusion card (auto-picks first match)' : 'needs 1 abstract + 1 concrete + 5 energy';
+  apt.appendChild(makeLocBtn('📐', 'Synthesize',       'Homework',   5, synthNote,           doSynthesize, !canSynth));
+  area.appendChild(apt);
+
+  // Park
+  const park = makeLocSection('🌳  Park');
+  park.appendChild(makeLocBtn('🌊', 'Visit Lake',    'Park · Lake', 2, '+1 concrete card', doLake,  !hasEnergy(2)));
+  park.appendChild(makeLocBtn('🌿', 'Walk on Lawn',  'Park · Lawn', 2, '+1 concrete card', doLawn,  !hasEnergy(2)));
+  area.appendChild(park);
+
+  // Sleep button
+  const sleepRow = document.createElement('div');
+  sleepRow.className = 'btn-row';
+  sleepRow.style.marginTop = '14px';
+  const sleepBtn = document.createElement('button');
+  sleepBtn.className = 'btn dim';
+  sleepBtn.textContent = STATE.day >= 7 ? '🌙  End of Week' : `🌙  Sleep  →  Day ${STATE.day + 1}`;
+  sleepBtn.addEventListener('click', doSleep);
+  sleepRow.appendChild(sleepBtn);
+  area.appendChild(sleepRow);
+}
+
+function makeLocSection(title) {
+  const sec = document.createElement('div');
+  sec.className = 'loc-section';
+  const lbl = document.createElement('div');
+  lbl.className = 'loc-section-label';
+  lbl.textContent = title;
+  sec.appendChild(lbl);
+  const grid = document.createElement('div');
+  grid.className = 'loc-grid';
+  sec.appendChild(grid);
+  // Attach grid ref so we can append buttons
+  sec._grid = grid;
+  sec.appendChild = (el) => {
+    if (el.classList && el.classList.contains('loc-btn')) sec._grid.appendChild(el);
+    else HTMLElement.prototype.appendChild.call(sec, el);
+  };
+  return sec;
+}
+
+function makeLocBtn(icon, name, sub, cost, yieldStr, handler, disabled = false) {
+  const btn = document.createElement('button');
+  btn.className = 'loc-btn';
+  btn.disabled  = disabled;
+  btn.innerHTML =
+    `<div class="li">${icon}</div>` +
+    `<div class="ln">${name}</div>` +
+    `<div class="lc">${sub} · ${cost === 0 ? 'Free' : `−${cost} energy`}</div>` +
+    `<div class="ly">${yieldStr}</div>`;
+  if (!disabled) btn.addEventListener('click', handler);
+  return btn;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════════════════════ */
+
+function doClass() {
+  spend(3);
+  STATE.classAttended = true;
+  const cards = Array.from({ length: 5 }, () => pickAbstract());
+  setLog(`Class: captured 5 fragments → ${cards.map(c => c.sym + ' ' + c.name).join(' / ')}`);
+  renderHeader();
+
+  enqueue(cards, () => {
+    STATE.phase = 'afternoon';
+    if (STATE.day === 7) showHomework();
+    renderActions();
+  });
+}
+
+function doTelephone() {
+  const card = pickConcrete('telephone');
+  const memNote = card.memory ? `  "${card.memory}"` : '';
+  setLog(`📞 Called home.${memNote}  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doInternet() {
+  if (!hasEnergy(2)) return;
+  spend(2);
+  renderHeader();
+  const card = pickConcrete('internet');
+  setLog(`💻 Browsed online.  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doSynthesize() {
+  if (!hasEnergy(5)) return;
+  const a = STATE.deck.find(c => c.type === 'abstract');
+  const b = STATE.deck.find(c => c.type === 'concrete');
+  if (!a || !b) return;
+
+  spend(5);
+  // Remove source cards from deck
+  STATE.deck = STATE.deck.filter(c => c.id !== a.id && c.id !== b.id);
+
+  const fusion = {
+    id:     uid(),
+    type:   'fusion',
+    origin: 'homework',
+    sym:    b.sym + '+' + a.sym,
+    name:   b.name + ' / ' + a.name,
+    tag:    a.tag,   // fusion inherits abstract's theme tag
+    memory: b.memory || null,
+  };
+
+  setLog(`📐 Synthesized: "${b.name}" + "${a.name}"  →  Fusion card "${fusion.name}"`);
+  renderDeck();
+  renderHeader();
+  enqueue([fusion], () => renderActions());
+}
+
+function doLake() {
+  if (!hasEnergy(2)) return;
+  spend(2);
+  renderHeader();
+  const card = pickConcrete('lake');
+  setLog(`🌊 Visited the lake.  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doLawn() {
+  if (!hasEnergy(2)) return;
+  spend(2);
+  renderHeader();
+  const card = pickConcrete('lawn');
+  setLog(`🌿 Walked on the lawn.  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doSleep() {
+  if (STATE.day >= 7) {
+    STATE.phase = 'done';
+    setLog('Week over.');
+    renderActions();
+    showEnd('End of Week', 'You didn\'t submit the assignment. The brief remains unanswered.');
+    return;
+  }
+  STATE.day++;
+  STATE.energy       = 15;
+  STATE.classAttended = false;
+  STATE.phase        = 'morning';
+  setLog(`Day ${STATE.day}. New day.`);
+  renderActions();
+  renderDeck();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HOMEWORK
+═══════════════════════════════════════════════════════════ */
+
+function showHomework() {
+  STATE.hwActive   = true;
+  STATE.hwSelected = [];
+
+  const area = document.getElementById('hw-area');
+  area.style.display = 'block';
+
+  document.getElementById('hw-brief').innerHTML =
+    `Brief symbol: <span class="sym">${STATE.briefSymbol}</span>` +
+    `<div style="font-size:.82rem;color:var(--dim);margin-top:4px">` +
+    `Cards whose <em>tag</em> matches <strong>${STATE.briefSymbol}</strong> count as on-brief.</div>`;
+
+  updateHwSelection();
+  renderDeck();
+
+  document.getElementById('hw-submit').onclick = submitHomework;
+}
+
+function toggleHwCard(id) {
+  if (!STATE.hwActive) return;
+  const idx = STATE.hwSelected.indexOf(id);
+  if (idx >= 0) {
+    STATE.hwSelected.splice(idx, 1);
+  } else {
+    if (STATE.hwSelected.length >= 4) {
+      setLog('Already selected 4 cards. Deselect one first.');
+      return;
+    }
+    STATE.hwSelected.push(id);
+  }
+  updateHwSelection();
+  renderDeck();
+}
+
+function updateHwSelection() {
+  const box = document.getElementById('hw-selection');
+  const btn = document.getElementById('hw-submit');
+  if (!STATE.hwSelected.length) {
+    box.innerHTML = '<span style="color:var(--dim);font-size:.82rem">No cards selected</span>';
+  } else {
+    box.innerHTML = STATE.hwSelected.map(id => {
+      const c = STATE.deck.find(x => x.id === id);
+      return c ? `<span class="hw-tag">${c.sym} ${c.name}</span>` : '';
+    }).join('');
+  }
+  btn.disabled = STATE.hwSelected.length !== 4;
+}
+
+function submitHomework() {
+  const selected = STATE.hwSelected.map(id => STATE.deck.find(c => c.id === id)).filter(Boolean);
+  if (selected.length !== 4) return;
+
+  const brief = STATE.briefSymbol;
+
+  // ── A. Theme Match ──
+  // Each card: abstract → tag === brief; concrete → tag === brief; fusion → tag === brief (inherited from abstract)
+  let hits = 0;
+  const judgeLines = [];
+  selected.forEach(card => {
+    const match = card.tag === brief;
+    if (match) hits++;
+    const line = `${match ? '✓' : '✗'}  "${card.name}"  [${card.type}, tag:${card.tag}]  →  ${match ? 'ON brief' : 'off brief'}`;
+    judgeLines.push(line);
+    console.log('[Homework Judge]', line);
+  });
+  const themePass = hits >= 2;
+  console.log(`[Homework] Theme: ${hits}/4 match "${brief}" → ${themePass ? 'PASS' : 'FAIL'}`);
+
+  // ── B. Diversity ──
+  // Fusion counts as BOTH abstract and concrete (GDD §6.2)
+  // BUT 4 fusion = single type (still penalised)
+  const allFusion = selected.every(c => c.type === 'fusion');
+  const typeSet = new Set();
+  selected.forEach(c => {
+    if (c.type === 'fusion') { typeSet.add('abstract'); typeSet.add('concrete'); }
+    else typeSet.add(c.type);
+  });
+  let diversity = allFusion ? 1 : typeSet.size;  // 1 low / 2 medium / 3 high
+  const divLabel = diversity >= 3 ? 'high' : diversity === 2 ? 'medium' : 'low';
+  console.log(`[Homework] Types: ${[...typeSet].join('+')}${allFusion?' (all-fusion penalty)':''} → diversity: ${divLabel}`);
+
+  // ── Feedback table (mirrors GDD §6.2 examples) ──
+  const FEEDBACK = {
+    'fail-low':    { grade:'D',  quote:'"I don\'t see how this engages with the brief."' },
+    'fail-medium': { grade:'C',  quote:'"Some engagement, but where\'s the brief in this?"' },
+    'fail-high':   { grade:'C+', quote:'"Rich vocabulary, but you didn\'t answer the question."' },
+    'pass-low':    { grade:'B-', quote:'"Technically on-brief, but where\'s the work?"' },
+    'pass-medium': { grade:'B',  quote:'"Some engagement, but feels collaged."' },
+    'pass-high':   { grade:'A',  quote:'"A clear voice working through the brief. This is the work."' },
+  };
+  // Special overrides from GDD table
+  // "4 fusion" → "Strong voice but underdeveloped"
+  const key = allFusion ? 'pass-low-fusion' : `${themePass ? 'pass' : 'fail'}-${divLabel}`;
+  const fb = allFusion
+    ? { grade:'B-', quote:'"Strong voice but underdeveloped — where\'s the rigor?"' }
+    : (FEEDBACK[key] || { grade:'C', quote:'"Submission received."' });
+
+  console.log(`[Homework] Key: ${key} → Grade: ${fb.grade}`);
+
+  // ── Show feedback ──
+  STATE.hwActive = false;
+  STATE.phase = 'done';
+  document.getElementById('hw-area').style.display = 'none';
+  document.getElementById('action-area').innerHTML = '';
+  renderDeck();
+
+  const fbArea = document.getElementById('fb-area');
+  fbArea.style.display = 'block';
+  document.getElementById('fb-grade').textContent = `Grade: ${fb.grade}`;
+  document.getElementById('fb-quote').textContent = fb.quote;
+  document.getElementById('fb-detail').textContent = [
+    `Brief: "${brief}"`,
+    `Theme match: ${hits}/4 cards on-brief  →  ${themePass ? 'PASSED' : 'FAILED'}`,
+    `Diversity: ${[...typeSet].join(' + ')}${allFusion ? '  (all-fusion — penalised)' : ''}  →  ${divLabel}`,
+    '',
+    'Per-card:',
+    ...judgeLines,
+  ].join('\n');
+
+  document.getElementById('fb-next').onclick = () => {
+    fbArea.style.display = 'none';
+    const { title, body } = getEnding();
+    showEnd(title, body);
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ENDING  (GDD §7)
+═══════════════════════════════════════════════════════════ */
+
+function getEnding() {
+  const native  = STATE.deck.filter(c => c.origin === 'native').length;
+  const fusion  = STATE.deck.filter(c => c.type === 'fusion').length;
+  const absFus  = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
+
+  if (fusion >= 3) {
+    return {
+      title: 'Fluent in Two Tongues',
+      body: 'Neither fully here nor there. Both. It\'s exhausting. It\'s yours.',
+    };
+  }
+  if (native <= 2 && fusion === 0) {
+    return {
+      title: 'Clean Slate',
+      body: 'The work is clean. The calls feel further away. You\'ve let a lot go.',
+    };
+  }
+  if (native >= 6 && absFus <= 2) {
+    return {
+      title: 'Untranslated',
+      body: 'The corridors are still noise. But home is still home. For now.',
+    };
+  }
+  return {
+    title: 'End of Week 1',
+    body:  'The semester continues. Seven more weeks to figure this out.',
+  };
+}
+
+function showEnd(title, body) {
+  document.getElementById('end-area').style.display = 'block';
+  document.getElementById('end-title').textContent = title;
+  document.getElementById('end-body').textContent  = body;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+
+function init() {
+  setLog(`Week 1 · Monday morning. This week's brief symbol: "${STATE.briefSymbol}". Go to class to start.`);
+  renderEnergy();
+  renderActions();
+  renderDeck();
+}
+
+init();
+</script>
+</body>
+</html>
