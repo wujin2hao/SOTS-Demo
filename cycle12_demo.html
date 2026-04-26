@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Static &amp; Signal · Vertical Slice</title>
+<style>
+/* ── Reset & Root ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #0a0a10;
+  --surface:   #141420;
+  --surface2:  #1c1c2a;
+  --border:    #2e2e42;
+  --border-hi: #4a4a68;
+  --text:      #e6e0d0;
+  --text-dim:  #6a6a88;
+  --accent:    #c8a878;
+  --accent-lo: rgba(200,168,120,0.12);
+
+  --c-circle:   #5ecfc0;
+  --c-square:   #f4a040;
+  --c-triangle: #e85050;
+  --c-diamond:  #90c8e0;
+  --c-cross:    #e8c040;
+  --c-star:     #c070f0;
+
+  --font-native: Georgia, 'Times New Roman', serif;
+  --font-trans:  'Courier New', Courier, monospace;
+  --font-ui:     'Segoe UI', system-ui, sans-serif;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  min-height: 100vh;
+  line-height: 1.5;
+  overflow-x: hidden;
+}
+
+/* ── Screen System ── */
+.screen { display: none; min-height: 100vh; padding: 28px 24px; }
+.screen.active { display: flex; flex-direction: column; }
+
+/* ── Buttons ── */
+.btn {
+  padding: 9px 24px;
+  border: 1px solid var(--border-hi);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  letter-spacing: 0.05em;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.btn:hover:not(:disabled) { background: var(--surface2); border-color: var(--accent); }
+.btn:disabled { opacity: 0.28; cursor: not-allowed; }
+.btn-primary { border-color: var(--accent); color: var(--accent); }
+.btn-primary:hover:not(:disabled) { background: var(--accent-lo); }
+.btn-danger  { border-color: var(--c-triangle); color: var(--c-triangle); }
+.btn-danger:hover:not(:disabled)  { background: rgba(232,80,80,0.12); }
+.btn-sm { padding: 6px 16px; font-size: 0.78rem; }
+
+/* ═══════════════════════════════════════════
+   TITLE
+═══════════════════════════════════════════ */
+#screen-title {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 14px;
+}
+#screen-title h1 {
+  font-family: var(--font-native);
+  font-size: 3.2rem;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+#screen-title .sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+.title-portrait {
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  border: 2px solid var(--border-hi);
+  object-fit: cover;
+  margin: 12px 0;
+}
+.title-portrait-placeholder {
+  width: 140px; height: 140px;
+  border-radius: 50%;
+  border: 2px solid var(--border-hi);
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 3rem; margin: 12px 0;
+}
+
+/* ═══════════════════════════════════════════
+   TUTORIAL
+═══════════════════════════════════════════ */
+#screen-tutorial { align-items: center; justify-content: center; }
+.tut-card {
+  max-width: 520px; width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 36px 40px;
+}
+.tut-card h2 { color: var(--accent); margin-bottom: 14px; font-size: 1.2rem; }
+.tut-card p  { color: var(--text-dim); line-height: 1.75; font-size: 0.92rem; }
+.tut-syms {
+  display: flex; gap: 14px; justify-content: center;
+  flex-wrap: wrap; margin: 18px 0;
+}
+.tut-sym { font-size: 2rem; }
+.tut-example {
+  display: flex; align-items: center; gap: 10px;
+  justify-content: center; margin: 16px 0;
+}
+.tut-mini-card {
+  width: 74px; min-height: 88px;
+  border: 2px solid;
+  padding: 6px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  font-size: 0.6rem;
+}
+.tut-nav {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 24px;
+}
+.tut-dots { display: flex; gap: 7px; }
+.tut-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border-hi);
+}
+.tut-dot.active { background: var(--accent); }
+
+/* ═══════════════════════════════════════════
+   LECTURE
+═══════════════════════════════════════════ */
+#screen-lecture { gap: 0; }
+.lec-header {
+  display: flex; align-items: center; gap: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+.lec-portrait {
+  width: 52px; height: 52px;
+  border-radius: 50%; border: 2px solid var(--border-hi);
+  object-fit: cover; flex-shrink: 0;
+}
+.lec-portrait-ph {
+  width: 52px; height: 52px;
+  border-radius: 50%; border: 2px solid var(--border-hi);
+  background: var(--surface2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.4rem; flex-shrink: 0;
+}
+.lec-info { flex: 1; }
+.lec-name { font-size: 0.82rem; color: var(--text); }
+.lec-cycle { font-size: 0.7rem; color: var(--text-dim); }
+.attn-block { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.attn-label { font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+.attn-pips { display: flex; gap: 5px; }
+.attn-pip {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--accent);
+  transition: background 0.3s, transform 0.15s;
+}
+.attn-pip.spent { background: var(--border); }
+
+.lec-body { display: flex; flex: 1; gap: 14px; min-height: 0; overflow: hidden; }
+
+.token-stream {
+  flex: 1; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 16px;
+  display: flex; flex-wrap: wrap; align-content: flex-start;
+  gap: 5px 4px;
+  min-height: 260px; max-height: 460px;
+}
+.tok {
+  display: inline-flex; align-items: center;
+  padding: 3px 7px; border-radius: 3px;
+  font-size: 0.93rem;
+  border: 1px solid transparent;
+  opacity: 0;
+  animation: tokAppear 0.25s forwards;
+  user-select: none;
+}
+@keyframes tokAppear { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+.tok-word { color: var(--text-dim); }
+.tok-sym {
+  border-color: var(--border-hi);
+  background: var(--surface2);
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-family: var(--font-trans);
+}
+.tok-sym:hover:not(.tok-cap):not(.tok-exp) { border-color: var(--accent); background: var(--accent-lo); }
+.tok-cap { opacity: 0.4 !important; cursor: default; }
+.tok-exp { opacity: 0.15 !important; pointer-events: none; transition: opacity 0.6s; }
+.tok-sym.no-attn { cursor: not-allowed; opacity: 0.5 !important; }
+
+.cap-sidebar {
+  width: 150px; flex-shrink: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 12px; overflow-y: auto;
+}
+.cap-sidebar h3 { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.14em; color: var(--text-dim); margin-bottom: 10px; }
+.cap-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0;
+  animation: flyIn 0.28s ease-out;
+}
+@keyframes flyIn { from { opacity:0; transform:translateX(16px); } to { opacity:1; transform:none; } }
+.cap-glyph { font-size: 1.3rem; }
+.cap-name  { font-size: 0.65rem; color: var(--text-dim); }
+
+/* ═══════════════════════════════════════════
+   BRIEF REVEAL
+═══════════════════════════════════════════ */
+#screen-brief { align-items: center; justify-content: center; gap: 22px; }
+.brief-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-dim); }
+.brief-desc { color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+.brief-slots { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+.brief-slot {
+  width: 78px; height: 78px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.2rem;
+  transition: border-color 0.3s;
+}
+.brief-slot.known { border-color: var(--accent); }
+.brief-slot.unk   { color: var(--text-dim); font-size: 1.8rem; font-family: var(--font-trans); }
+
+/* ═══════════════════════════════════════════
+   ASSIGNMENT
+═══════════════════════════════════════════ */
+#screen-assign { gap: 10px; }
+
+.brief-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px;
+  background: var(--surface); border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.brief-bar-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 6px; }
+.brief-bar-slot {
+  width: 34px; height: 34px;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.05rem;
+}
+.brief-bar-slot.known { border-color: var(--accent); }
+
+.chain-area {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px;
+}
+.chain-hint { font-size: 0.72rem; color: var(--text-dim); }
+.chain-row {
+  display: flex; align-items: center; gap: 0;
+  flex-wrap: wrap; justify-content: center;
+}
+.chain-slot {
+  width: 108px; min-height: 138px;
+  border: 2px dashed var(--border);
+  background: var(--surface);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  position: relative;
+  transition: border-color 0.2s;
+  flex-shrink: 0;
+}
+.chain-slot.active-slot { border-color: var(--accent); border-style: dashed; }
+.chain-slot.filled     { border-style: solid; border-color: var(--border-hi); }
+.chain-slot.mismatch-slot { border-color: var(--c-triangle) !important; }
+.chain-slot .slot-num { font-size: 0.6rem; color: var(--text-dim); position: absolute; top: 6px; left: 8px; }
+.chain-conn {
+  width: 22px; height: 2px; background: var(--border);
+  flex-shrink: 0; margin: 0 -1px;
+}
+.chain-conn.broken { background: var(--c-triangle); }
+.assign-btns { display: flex; gap: 10px; }
+
+.hand-area {
+  background: var(--surface); border-top: 1px solid var(--border);
+  padding: 12px 16px; flex-shrink: 0;
+}
+.hand-label { font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+.hand-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+
+/* ═══════════════════════════════════════════
+   CARDS
+═══════════════════════════════════════════ */
+.card {
+  width: 104px; min-height: 132px;
+  border: 2px solid;
+  padding: 7px 6px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: space-between;
+  cursor: pointer; flex-shrink: 0;
+  position: relative;
+  transition: transform 0.14s, box-shadow 0.14s;
+  user-select: none;
+}
+.card:hover { transform: translateY(-3px); box-shadow: 0 7px 18px rgba(0,0,0,0.5); }
+.card.selected-card { box-shadow: 0 0 0 3px var(--accent), 0 7px 18px rgba(0,0,0,0.5); transform: translateY(-5px); }
+
+.card.native     { border-color: #7a6040; background: #131008; font-family: var(--font-native); }
+.card.translated { border-color: #304878; background: #080f1c; font-family: var(--font-trans); }
+.card.fusion     {
+  border-color: #7a6040;
+  background: linear-gradient(150deg, #131008 55%, #080f1c 55%);
+  box-shadow: inset 0 0 0 1px #304878;
+}
+
+.card-tag  { font-size: 0.48rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.12em; align-self: flex-start; }
+.card-name { font-size: 0.62rem; text-align: center; color: var(--text-dim); line-height: 1.35; flex: 1; display: flex; align-items: center; justify-content: center; padding: 2px; }
+.card-syms { display: flex; justify-content: space-between; width: 100%; font-size: 1.25rem; padding: 2px 0; }
+.card.in-chain { width: 100%; min-height: 100%; cursor: default; }
+.card.in-chain:hover { transform: none; box-shadow: none; }
+.mismatch-crack {
+  position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+  border: 2px solid var(--c-triangle);
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    -45deg, transparent, transparent 6px,
+    rgba(232,80,80,0.06) 6px, rgba(232,80,80,0.06) 8px
+  );
+}
+
+/* ═══════════════════════════════════════════
+   SUBMIT TRANSITION
+═══════════════════════════════════════════ */
+#screen-submit { align-items: center; justify-content: center; }
+.collage { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; max-width: 380px; }
+.col-block { border-radius: 2px; animation: colPulse 1.8s ease-in-out infinite alternate; }
+@keyframes colPulse { from { opacity:0.5; } to { opacity:1; } }
+
+/* ═══════════════════════════════════════════
+   FEEDBACK
+═══════════════════════════════════════════ */
+#screen-feedback { align-items: center; justify-content: center; gap: 22px; }
+.fb-header { display: flex; align-items: center; gap: 14px; }
+.fb-portrait { width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--border-hi); object-fit: cover; }
+.fb-portrait-ph { width: 58px; height: 58px; border-radius: 50%; border: 2px solid var(--border-hi); background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
+.fb-name  { font-size: 0.82rem; }
+.fb-cycle { font-size: 0.7rem; color: var(--text-dim); }
+.fb-lines { max-width: 500px; width: 100%; }
+.fb-line {
+  padding: 14px 16px;
+  border-left: 3px solid var(--border);
+  margin-bottom: 12px;
+  background: var(--surface);
+  animation: fbSlide 0.35s ease-out backwards;
+}
+.fb-line:nth-child(1) { animation-delay: 0.05s; }
+.fb-line:nth-child(2) { animation-delay: 0.18s; }
+.fb-line:nth-child(3) { animation-delay: 0.31s; }
+@keyframes fbSlide { from { opacity:0; transform:translateX(-10px); } to { opacity:1; transform:none; } }
+.fb-line.hi  { border-color: var(--c-circle); }
+.fb-line.mid { border-color: var(--c-cross); }
+.fb-line.lo  { border-color: var(--c-triangle); }
+.fb-axis { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--text-dim); margin-bottom: 5px; }
+.fb-text { font-size: 0.93rem; line-height: 1.65; }
+.fb-compare { font-size: 0.78rem; color: var(--text-dim); margin-top: 6px; font-style: italic; }
+
+/* ═══════════════════════════════════════════
+   DECK DECISION
+═══════════════════════════════════════════ */
+#screen-decision { gap: 16px; }
+.dec-header { text-align: center; padding: 0 0 6px; }
+.dec-header h2 { color: var(--accent); font-size: 1.2rem; margin-bottom: 6px; }
+.dec-header p  { color: var(--text-dim); font-size: 0.85rem; }
+.dec-cards { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 860px; margin: 0 auto; flex: 1; overflow-y: auto; }
+.dec-card-wrap .card { transition: transform 0.14s, box-shadow 0.14s; }
+.dec-card-wrap.sel-a .card { box-shadow: 0 0 0 3px var(--c-triangle); transform: translateY(-4px); }
+.dec-card-wrap.sel-b .card { box-shadow: 0 0 0 3px var(--c-circle); transform: translateY(-4px); }
+.dec-actions { display: flex; gap: 20px; justify-content: center; align-items: flex-start; flex-shrink: 0; padding: 4px 0 8px; }
+.dec-btn-grp { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.dec-hint { font-size: 0.68rem; color: var(--text-dim); max-width: 150px; text-align: center; line-height: 1.4; }
+
+/* ═══════════════════════════════════════════
+   END
+═══════════════════════════════════════════ */
+#screen-end { align-items: center; justify-content: center; text-align: center; gap: 18px; }
+#screen-end h2 { color: var(--accent); font-size: 1.5rem; font-family: var(--font-native); }
+#screen-end p  { color: var(--text-dim); max-width: 380px; font-size: 0.9rem; line-height: 1.75; }
+.end-portrait { width: 90px; height: 90px; border-radius: 50%; border: 2px solid var(--border-hi); object-fit: cover; }
+
+/* ═══════════════════════════════════════════
+   OVERLAYS
+═══════════════════════════════════════════ */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  z-index: 200;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 40px;
+}
+.overlay.show { display: flex; }
+
+#memory-overlay { background: rgba(0,0,0,0.93); flex-direction: column; gap: 20px; }
+#memory-text { font-family: var(--font-native); font-size: 1.15rem; color: var(--accent); line-height: 1.9; max-width: 460px; }
+#memory-sub  { font-size: 0.72rem; color: var(--text-dim); letter-spacing: 0.1em; text-transform: uppercase; }
+
+#force-overlay { background: rgba(0,0,0,0.75); }
+.force-box {
+  background: var(--surface2); border: 1px solid var(--border-hi);
+  padding: 30px 36px; max-width: 340px;
+}
+.force-box p { color: var(--text-dim); margin-bottom: 10px; font-size: 0.9rem; }
+.force-cost  { color: var(--c-triangle); font-size: 0.82rem; margin-bottom: 18px !important; }
+.force-btns  { display: flex; gap: 12px; justify-content: center; }
+
+/* ═══════════════════════════════════════════
+   SCROLLBAR
+═══════════════════════════════════════════ */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Memory Flash Overlay ── -->
+<div class="overlay" id="memory-overlay">
+  <div id="memory-sub">— memory —</div>
+  <div id="memory-text"></div>
+</div>
+
+<!-- ── Force Mismatch Overlay ── -->
+<div class="overlay" id="force-overlay">
+  <div class="force-box">
+    <p>Force this connection? It won't fit cleanly.</p>
+    <p class="force-cost">Coherence −25</p>
+    <div class="force-btns">
+      <button class="btn btn-danger" id="btn-force-yes">Force</button>
+      <button class="btn" id="btn-force-no">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TITLE
+══════════════════════════════════════════ -->
+<section class="screen active" id="screen-title">
+  <div id="title-portrait-slot"></div>
+  <h1>Static &amp; Signal</h1>
+  <div class="sub">a vertical slice · 2 cycles</div>
+  <button class="btn btn-primary" id="btn-begin" style="margin-top:20px;padding:11px 36px;font-size:1rem">Begin</button>
+</section>
+
+<!-- ══════════════════════════════════════════
+     TUTORIAL
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-tutorial">
+  <div class="tut-card" id="tut-container"></div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     LECTURE
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-lecture">
+  <div class="lec-header">
+    <div id="lec-portrait-slot"></div>
+    <div class="lec-info">
+      <div class="lec-name">Dr. Hollow</div>
+      <div class="lec-cycle" id="lec-cycle-label"></div>
+    </div>
+    <div class="attn-block">
+      <span class="attn-label">Attention</span>
+      <div class="attn-pips" id="attn-pips"></div>
+    </div>
+  </div>
+  <div class="lec-body">
+    <div class="token-stream" id="token-stream"></div>
+    <div class="cap-sidebar">
+      <h3>Captured</h3>
+      <div id="cap-list"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     BRIEF REVEAL
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-brief">
+  <div class="brief-label">Cycle <span id="brief-cycle-n"></span> · Brief</div>
+  <div class="brief-desc">Today's brief, as you understood it:</div>
+  <div class="brief-slots" id="brief-slots"></div>
+  <button class="btn btn-primary" id="btn-begin-assign">Begin Assignment →</button>
+</section>
+
+<!-- ══════════════════════════════════════════
+     ASSIGNMENT
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-assign">
+  <div class="brief-bar">
+    <span class="brief-bar-label">Brief</span>
+    <div id="brief-bar-slots" style="display:flex;gap:6px;"></div>
+    <span style="margin-left:auto;font-size:0.7rem;color:var(--text-dim)">Build a <span id="chain-len-hint"></span>-card chain · symbols must connect</span>
+  </div>
+  <div class="chain-area">
+    <div class="chain-row" id="chain-row"></div>
+    <div class="assign-btns">
+      <button class="btn btn-sm" id="btn-undo">← Undo  <kbd style="font-size:0.65rem;opacity:0.5">Z</kbd></button>
+      <button class="btn btn-primary btn-sm" id="btn-submit" disabled>Submit →</button>
+    </div>
+  </div>
+  <div class="hand-area">
+    <div class="hand-label">Your Hand <span id="hand-count" style="opacity:0.5"></span></div>
+    <div class="hand-row" id="hand-row"></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     SUBMIT TRANSITION
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-submit">
+  <div class="collage" id="submit-collage"></div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     FEEDBACK
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-feedback">
+  <div class="fb-header">
+    <div id="fb-portrait-slot"></div>
+    <div>
+      <div class="fb-name">Dr. Hollow</div>
+      <div class="fb-cycle" id="fb-cycle-label"></div>
+    </div>
+  </div>
+  <div class="fb-lines" id="fb-lines"></div>
+  <button class="btn btn-primary" id="btn-fb-next">Continue →</button>
+</section>
+
+<!-- ══════════════════════════════════════════
+     DECK DECISION
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-decision">
+  <div class="dec-header">
+    <h2>Your deck is over capacity.</h2>
+    <p>More words have come in. Your deck can hold 10. Choose what stays.</p>
+  </div>
+  <div class="dec-cards" id="dec-cards"></div>
+  <div class="dec-actions">
+    <div class="dec-btn-grp">
+      <button class="btn btn-danger" id="btn-discard" disabled>Discard</button>
+      <div class="dec-hint">Remove one card permanently.</div>
+    </div>
+    <div class="dec-btn-grp">
+      <button class="btn" id="btn-keep" disabled>Keep</button>
+      <div class="dec-hint">Refuse a translated card.<br>Cycle 2 Attention −1.</div>
+    </div>
+    <div class="dec-btn-grp">
+      <button class="btn btn-primary" id="btn-fuse" disabled>Fuse</button>
+      <div class="dec-hint" id="fuse-hint">Select 1 native + 1 translated that share a symbol.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+     END
+══════════════════════════════════════════ -->
+<section class="screen" id="screen-end">
+  <div id="end-portrait-slot"></div>
+  <h2>End of Demo</h2>
+  <p>This has been a vertical slice of <em>Static &amp; Signal</em>.<br>Two cycles. One deck, evolving.</p>
+  <p style="font-style:italic;font-size:0.8rem;margin-top:4px">— Thank you for playing —</p>
+  <button class="btn btn-primary" id="btn-restart" style="margin-top:8px">↺ Restart</button>
+</section>
+
+<script>
+/* ════════════════════════════════════════════════
+   CONSTANTS
+════════════════════════════════════════════════ */
+const SYMBOLS = ['circle','square','triangle','diamond','cross','star'];
+const G = { circle:'◯', square:'□', triangle:'△', diamond:'◇', cross:'✚', star:'☆' };
+const SC = {
+  circle:  'var(--c-circle)',
+  square:  'var(--c-square)',
+  triangle:'var(--c-triangle)',
+  diamond: 'var(--c-diamond)',
+  cross:   'var(--c-cross)',
+  star:    'var(--c-star)',
+};
+
+const NATIVE_DECK = [
+  { id:'n1', name:'外婆的厨房',     left:'circle',   right:'diamond',  origin:'native', memory:'外婆把刚剥好的橘子塞进我手里，说"凉，你戴帽子"' },
+  { id:'n2', name:'雨夜回家',       left:'triangle', right:'circle',   origin:'native', memory:'巷子湿，路灯黄，钥匙转了三下才进对孔' },
+  { id:'n3', name:'旧课本边角',     left:'square',   right:'triangle', origin:'native', memory:'高一数学第 43 页画了一只翅膀坏掉的鸟' },
+  { id:'n4', name:'春节的红包',     left:'cross',    right:'diamond',  origin:'native', memory:'压岁钱被妈妈收走，半夜又偷偷塞回我枕头底下' },
+  { id:'n5', name:'楼下小卖部',     left:'circle',   right:'star',     origin:'native', memory:'一块钱三颗的水果糖，糖纸我留了一抽屉' },
+  { id:'n6', name:'方言口头禅',     left:'triangle', right:'cross',    origin:'native', memory:'外婆说"莫法"——这个词在普通话里没有完全对应的翻译' },
+  { id:'n7', name:'高考前夜的台灯', left:'square',   right:'diamond',  origin:'native', memory:'凌晨两点台灯下，最后一道压轴题画了三遍辅助线' },
+  { id:'n8', name:'第一次坐火车',   left:'star',     right:'square',   origin:'native', memory:'窗外的田后退得比我想象的快' },
+];
+
+const TRANS_NAMES = [
+  'Compositional Logic','Negative Space','Material Tension','Frame and Field',
+  'Iteration','Critical Distance','Picture Plane','Surface Reading',
+];
+
+const FB = {
+  legibility: {
+    hi:  "I can see what you're trying to say. The argument lands.",
+    mid: "Some parts come through. Others… I'm filling in for you.",
+    lo:  "I'm honestly not sure I follow this.",
+  },
+  voice: {
+    hi:  "There's something distinctly yours in this. Keep that.",
+    mid: "I catch glimpses of a perspective. Bring it forward more.",
+    lo:  "It feels assembled rather than expressed. Where are you in this?",
+  },
+  coherence: {
+    hi:  "It holds together as a piece.",
+    mid: "The transitions are uneven, but the whole stands.",
+    lo:  "The pieces don't quite fit. Reconsider how they connect.",
+  },
+};
+
+const GLITCH = '▓▒░█▄▀■▪◆⣿⬛⬜'.split('');
+
+/* ════════════════════════════════════════════════
+   LECTURE SCRIPTS
+════════════════════════════════════════════════ */
+function buildScript(cycle) {
+  // cycle 1: 40 tokens, key pos (1-indexed): 4(square), 9(circle), 14(star), 21(cross), 26(diamond)
+  // cycle 2: 50 tokens, key pos (1-indexed): 1(triangle), 4(diamond), 7(circle), 13(cross), 18(star), 22(diamond)
+
+  const defs1 = [
+    [2,'circle'],[4,'square',true],[5,'triangle'],
+    [7,'diamond'],[9,'circle',true],[11,'cross'],
+    [12,'square'],[14,'star',true],[16,'triangle'],
+    [17,'diamond'],[20,'square'],[21,'cross',true],
+    [23,'circle'],[24,'triangle'],[26,'diamond',true],
+    [28,'cross'],[30,'circle'],[33,'star'],
+    [35,'triangle'],[36,'square'],[38,'diamond'],[40,'star'],
+  ];
+  const words1 = [
+    'Today,','—','beginning','with','form.','The','first','principle',
+    '—','balance','—','holds','everything','together.','Without','it,',
+    'the','composition','collapses.','Notice','how','each','element',
+    'responds','to','the','next.','This','is','the','language',
+    'of','visual','thinking.','Study','it','carefully.','You','will','need',
+  ];
+
+  const defs2 = [
+    [1,'triangle',true],[3,'square'],[4,'diamond',true],
+    [6,'cross'],[7,'circle',true],[9,'square'],
+    [10,'star'],[12,'triangle'],[13,'cross',true],
+    [15,'diamond'],[16,'circle'],[18,'star',true],
+    [19,'square'],[21,'triangle'],[22,'diamond',true],
+    [25,'circle'],[26,'star'],[29,'square'],
+    [31,'triangle'],[32,'diamond'],[34,'cross'],
+    [35,'circle'],[37,'star'],[38,'square'],
+    [40,'triangle'],[41,'diamond'],[43,'circle'],
+    [44,'cross'],[46,'star'],[47,'square'],
+    [49,'triangle'],[50,'diamond'],
+  ];
+  const words2 = [
+    'Last','time,','we','scratched','the','surface.','Now','we','go','deeper.',
+    'Consider','the','tension','between','legibility','and','expression.','Can','you','hold',
+    'both?','The','best','work','does.','Look','at','these','examples.','Each',
+    'one','makes','a','choice.','What','choice','will','you','make?','The',
+    'brief','awaits','your','response.','Make','it','count.','This','is','your',
+  ];
+
+  const count = cycle === 1 ? 40 : 50;
+  const defs  = cycle === 1 ? defs1 : defs2;
+  const words = cycle === 1 ? words1 : words2;
+
+  const toks = Array.from({length: count}, (_, i) => ({
+    pos: i + 1, text: words[i] || '·', symbol: null, isKey: false,
+  }));
+  defs.forEach(([pos, sym, key]) => {
+    toks[pos - 1].symbol = sym;
+    if (key) toks[pos - 1].isKey = true;
+  });
+  return toks;
+}
+
+/* ════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════ */
+let S = {};
+
+function initState() {
+  S = {
+    screen: 'title',
+    cycle: 1,
+    tutSlide: 0,
+
+    // lecture
+    attnPool: 4,
+    capturedPos: new Set(),
+    capturedSyms: [],
+    lectureScript: null,
+    lectureIdx: 0,
+    lectureTimer: null,
+
+    // deck
+    deck: NATIVE_DECK.map(c => ({...c})),
+    transThisCycle: [],
+
+    // brief / assignment
+    brief: [],            // revealed (sym or null)
+    briefSecret: [],      // always the real sym
+    hand: [],
+    chain: [],
+    mismatches: 0,
+    selectedCard: null,
+    pendingPlace: null,   // {card, slotIdx} awaiting force confirm
+
+    // scores
+    scores: { legibility: 0, voice: 0, coherence: 0 },
+    prevScores: null,
+
+    // decision
+    keepPenalty: false,
+    decSelA: null,
+    decSelB: null,
+  };
+}
+
+/* ════════════════════════════════════════════════
+   SCREEN NAVIGATION
+════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+  S.screen = id;
+}
+
+/* ════════════════════════════════════════════════
+   PORTRAIT HELPERS
+════════════════════════════════════════════════ */
+function portraitEl(src, cls, fallbackEmoji) {
+  const img = document.createElement('img');
+  img.src = src; img.className = cls;
+  img.onerror = function() {
+    const ph = document.createElement('div');
+    ph.className = cls + '-ph';
+    ph.textContent = fallbackEmoji;
+    this.replaceWith(ph);
+  };
+  return img;
+}
+
+function setupPortraits() {
+  // Title
+  const t = document.getElementById('title-portrait-slot');
+  t.innerHTML = '';
+  const ti = portraitEl('Char-03.png', 'title-portrait', '🎓');
+  t.appendChild(ti);
+
+  // Lecture
+  const lp = document.getElementById('lec-portrait-slot');
+  lp.innerHTML = '';
+  lp.appendChild(portraitEl('Char-01.png', 'lec-portrait', '👩‍🏫'));
+
+  // Feedback
+  const fp = document.getElementById('fb-portrait-slot');
+  fp.innerHTML = '';
+  fp.appendChild(portraitEl('Char-02.png', 'fb-portrait', '🎓'));
+
+  // End
+  const ep = document.getElementById('end-portrait-slot');
+  ep.innerHTML = '';
+  const ei = portraitEl('Char-05.png', 'end-portrait', '✨');
+  ep.appendChild(ei);
+}
+
+/* ════════════════════════════════════════════════
+   TUTORIAL
+════════════════════════════════════════════════ */
+const TUT_SLIDES = [
+  {
+    title: 'Listen & Capture',
+    html: `Dr. Hollow's lecture streams past. When you see a <strong>symbol</strong>, click it to capture it — but you only have limited <strong>Attention</strong> points. Spend wisely.<br><br>Symbols you miss will become <strong>?</strong> in the brief.`,
+    syms: true,
+  },
+  {
+    title: 'Build Your Chain',
+    html: `After the lecture you get a <strong>Brief</strong>: the key symbols (or ? if you missed them).<br><br>Build a chain of cards so each card's <strong>right</strong> symbol matches the next card's <strong>left</strong> symbol.`,
+    example: true,
+  },
+  {
+    title: 'Evolve Your Deck',
+    html: `Between cycles your deck grows — but it has a limit of 10.<br><br>You'll face a choice: <strong>Discard</strong> forever · <strong>Keep</strong> (refuse a word, but at a cost) · <strong>Fuse</strong> two cards into something new.<br><br>Every choice leaves a mark.`,
+  },
+];
+
+function renderTutorial() {
+  const slide = TUT_SLIDES[S.tutSlide];
+  const n = S.tutSlide;
+  const last = n === TUT_SLIDES.length - 1;
+  document.getElementById('tut-container').innerHTML = `
+    <div style="font-size:0.65rem;color:var(--text-dim);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:12px">
+      Tutorial ${n+1} / ${TUT_SLIDES.length}
+    </div>
+    <h2>${slide.title}</h2>
+    ${slide.syms ? `
+      <div class="tut-syms">
+        ${SYMBOLS.map(s=>`<span class="tut-sym" style="color:${SC[s]}">${G[s]}</span>`).join('')}
+      </div>` : ''}
+    ${slide.example ? `
+      <div class="tut-example">
+        <div class="tut-mini-card" style="border-color:#7a6040;background:#131008;font-family:serif">
+          <span style="font-size:0.55rem;color:var(--text-dim)">外婆的厨房</span>
+          <div style="display:flex;justify-content:space-between;width:100%;font-size:1.1rem">
+            <span style="color:${SC.circle}">${G.circle}</span>
+            <span style="color:${SC.diamond}">${G.diamond}</span>
+          </div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-dim)">→</div>
+        <div class="tut-mini-card" style="border-color:#304878;background:#080f1c;font-family:monospace">
+          <span style="font-size:0.52rem;color:var(--text-dim)">Negative Space</span>
+          <div style="display:flex;justify-content:space-between;width:100%;font-size:1.1rem">
+            <span style="color:${SC.diamond}">${G.diamond}</span>
+            <span style="color:${SC.star}">${G.star}</span>
+          </div>
+        </div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-dim);margin-bottom:8px">${G.diamond} connects ${G.diamond} — valid chain</div>
+    ` : ''}
+    <p>${slide.html}</p>
+    <div class="tut-nav">
+      <button class="btn btn-sm" id="tut-prev" ${n===0?'disabled':''}>← Back</button>
+      <div class="tut-dots">
+        ${TUT_SLIDES.map((_,i)=>`<div class="tut-dot ${i===n?'active':''}"></div>`).join('')}
+      </div>
+      <button class="btn btn-primary btn-sm" id="tut-next">${last ? 'Start →' : 'Next →'}</button>
+    </div>
+    <div style="text-align:center;margin-top:14px">
+      <button class="btn btn-sm" id="tut-skip" style="opacity:0.45;font-size:0.72rem">Skip Tutorial</button>
+    </div>
+  `;
+  document.getElementById('tut-prev').addEventListener('click', () => { if(n>0){S.tutSlide--;renderTutorial();} });
+  document.getElementById('tut-next').addEventListener('click', () => { if(!last){S.tutSlide++;renderTutorial();} else startLecture(1); });
+  document.getElementById('tut-skip').addEventListener('click', () => startLecture(1));
+}
+
+/* ════════════════════════════════════════════════
+   LECTURE
+════════════════════════════════════════════════ */
+function startLecture(cycle) {
+  S.cycle = cycle;
+  S.capturedPos = new Set();
+  S.capturedSyms = [];
+  S.transThisCycle = [];
+  S.attnPool = cycle === 1 ? 4 : (S.keepPenalty ? 4 : 5);
+  S.lectureScript = buildScript(cycle);
+  S.lectureIdx = 0;
+  if (S.lectureTimer) clearTimeout(S.lectureTimer);
+
+  document.getElementById('lec-cycle-label').textContent = `Cycle ${cycle} Lecture`;
+  document.getElementById('token-stream').innerHTML = '';
+  document.getElementById('cap-list').innerHTML = '';
+  renderAttnPips();
+  showScreen('lecture');
+  scheduleToken();
+}
+
+function renderAttnPips() {
+  const max = S.cycle === 1 ? 4 : (S.keepPenalty ? 4 : 5);
+  document.getElementById('attn-pips').innerHTML =
+    Array.from({length: max}, (_,i) =>
+      `<div class="attn-pip ${i >= S.attnPool ? 'spent' : ''}"></div>`
+    ).join('');
+}
+
+function scheduleToken() {
+  S.lectureTimer = setTimeout(emitToken, 800);
+}
+
+function emitToken() {
+  const script = S.lectureScript;
+  if (S.lectureIdx >= script.length) {
+    setTimeout(endLecture, 600);
+    return;
+  }
+  const tok = script[S.lectureIdx];
+  const stream = document.getElementById('token-stream');
+
+  const el = document.createElement('span');
+  if (tok.symbol) {
+    el.className = 'tok tok-sym';
+    // Show as glitch initially
+    el.textContent = GLITCH[Math.floor(Math.random()*GLITCH.length)] + GLITCH[Math.floor(Math.random()*GLITCH.length)];
+    el.dataset.pos = tok.pos;
+    el.dataset.sym = tok.symbol;
+    el.title = S.attnPool > 0 ? `Click to capture (costs 1 Attention)` : 'No attention left';
+    el.addEventListener('click', () => captureToken(el, tok));
+    // Expire after 3s
+    setTimeout(() => {
+      if (!el.classList.contains('tok-cap')) el.classList.add('tok-exp');
+    }, 3000);
+  } else {
+    el.className = 'tok tok-word';
+    el.textContent = tok.text;
+  }
+  stream.appendChild(el);
+  stream.scrollTop = stream.scrollHeight;
+
+  S.lectureIdx++;
+  scheduleToken();
+}
+
+function captureToken(el, tok) {
+  if (el.classList.contains('tok-cap') || el.classList.contains('tok-exp')) return;
+  if (S.attnPool <= 0) { el.classList.add('no-attn'); return; }
+
+  S.attnPool--;
+  renderAttnPips();
+
+  el.classList.remove('no-attn');
+  el.classList.add('tok-cap');
+  el.textContent = G[tok.symbol];
+  el.style.color = SC[tok.symbol];
+  el.style.borderColor = SC[tok.symbol];
+
+  S.capturedPos.add(tok.pos);
+  S.capturedSyms.push(tok.symbol);
+
+  // Sidebar
+  const item = document.createElement('div');
+  item.className = 'cap-item';
+  item.innerHTML = `<span class="cap-glyph" style="color:${SC[tok.symbol]}">${G[tok.symbol]}</span><span class="cap-name">${tok.symbol}</span>`;
+  document.getElementById('cap-list').appendChild(item);
+}
+
+function endLecture() {
+  // Generate translated cards
+  const usedNames = new Set(S.deck.map(c => c.name));
+  S.capturedSyms.forEach(sym => {
+    const name = pickTransName(usedNames);
+    usedNames.add(name);
+    const right = weightedSym(S.capturedSyms, sym);
+    const card = {
+      id: 'tr_' + Date.now() + '_' + Math.random().toString(36).slice(2,5),
+      name, left: sym, right, origin: 'translated', memory: null,
+    };
+    S.transThisCycle.push(card);
+    S.deck.push(card);
+  });
+  showBrief();
+}
+
+function pickTransName(used) {
+  const avail = TRANS_NAMES.filter(n => !used.has(n));
+  const pool = avail.length ? avail : TRANS_NAMES;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function weightedSym(captured, exclude) {
+  const w = {};
+  SYMBOLS.forEach(s => { w[s] = 1; });
+  captured.forEach(s => { w[s] = (w[s] || 1) + 1; });
+  if (w[exclude]) delete w[exclude];
+  const pool = [];
+  Object.entries(w).forEach(([s, n]) => { for(let i=0;i<n;i++) pool.push(s); });
+  if (!pool.length) return SYMBOLS.find(s=>s!==exclude) || SYMBOLS[0];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+/* ════════════════════════════════════════════════
+   BRIEF REVEAL
+════════════════════════════════════════════════ */
+function showBrief() {
+  const keyToks = S.lectureScript.filter(t => t.isKey);
+  S.briefSecret = keyToks.map(t => t.symbol);
+  S.brief = keyToks.map(t => S.capturedPos.has(t.pos) ? t.symbol : null);
+
+  document.getElementById('brief-cycle-n').textContent = S.cycle;
+  document.getElementById('brief-slots').innerHTML = S.brief.map((sym, i) =>
+    `<div class="brief-slot ${sym ? 'known' : 'unk'}">
+      ${sym ? `<span style="color:${SC[sym]}">${G[sym]}</span>` : '?'}
+    </div>`
+  ).join('');
+  showScreen('brief');
+}
+
+/* ════════════════════════════════════════════════
+   ASSIGNMENT
+════════════════════════════════════════════════ */
+function startAssign() {
+  S.chain = [];
+  S.mismatches = 0;
+  S.selectedCard = null;
+  S.hand = [...S.deck];
+  const len = S.cycle === 1 ? 5 : 6;
+  document.getElementById('chain-len-hint').textContent = len;
+  renderBriefBar();
+  renderChain();
+  renderHand();
+  document.getElementById('btn-submit').disabled = true;
+  showScreen('assign');
+}
+
+function renderBriefBar() {
+  document.getElementById('brief-bar-slots').innerHTML = S.brief.map((sym, i) =>
+    `<div class="brief-bar-slot ${sym?'known':''}">
+      ${sym ? `<span style="color:${SC[sym]}">${G[sym]}</span>` : '?'}
+    </div>`
+  ).join('');
+}
+
+function renderChain() {
+  const len = S.cycle === 1 ? 5 : 6;
+  const row = document.getElementById('chain-row');
+  row.innerHTML = '';
+  for (let i = 0; i < len; i++) {
+    if (i > 0) {
+      const conn = document.createElement('div');
+      const prevCard = S.chain[i-1];
+      const currCard = S.chain[i];
+      const broken = prevCard && currCard && prevCard.right !== currCard.left;
+      conn.className = 'chain-conn' + (broken ? ' broken' : '');
+      row.appendChild(conn);
+    }
+    const slot = document.createElement('div');
+    const card = S.chain[i];
+    slot.className = 'chain-slot' + (card ? ' filled' : '') + (card && card._mismatch ? ' mismatch-slot' : '') + (!card && i === S.chain.length ? ' active-slot' : '');
+    slot.innerHTML = `<span class="slot-num">${i+1}</span>`;
+    if (card) {
+      slot.appendChild(buildCardEl(card, true));
+      if (card._mismatch) {
+        const crack = document.createElement('div');
+        crack.className = 'mismatch-crack';
+        slot.appendChild(crack);
+      }
+    } else if (i === S.chain.length) {
+      const ph = document.createElement('div');
+      ph.style.cssText = 'font-size:1.8rem;color:var(--border-hi);margin-top:12px';
+      ph.textContent = '＋';
+      slot.appendChild(ph);
+    }
+    row.appendChild(slot);
+  }
+  document.getElementById('btn-submit').disabled = S.chain.length < len;
+}
+
+function buildCardEl(card, inChain) {
+  const el = document.createElement('div');
+  el.className = `card ${card.origin}` + (inChain ? ' in-chain' : '');
+  el.title = card.memory || `${card.name} · Translated · meaning unclear`;
+  el.innerHTML = `
+    <div class="card-tag">${card.origin}</div>
+    <div class="card-name">${card.name}</div>
+    <div class="card-syms">
+      <span style="color:${SC[card.left]}">${G[card.left]}</span>
+      <span style="color:${SC[card.right]}">${G[card.right]}</span>
+    </div>
+  `;
+  return el;
+}
+
+function renderHand() {
+  const inChainIds = new Set(S.chain.map(c=>c.id));
+  const available = S.hand.filter(c => !inChainIds.has(c.id));
+  const row = document.getElementById('hand-row');
+  row.innerHTML = '';
+  document.getElementById('hand-count').textContent = `(${available.length})`;
+  available.forEach(card => {
+    const el = buildCardEl(card, false);
+    if (S.selectedCard && S.selectedCard.id === card.id) el.classList.add('selected-card');
+    el.addEventListener('click', () => onHandCardClick(card));
+    row.appendChild(el);
+  });
+}
+
+function onHandCardClick(card) {
+  if (S.selectedCard && S.selectedCard.id === card.id) {
+    S.selectedCard = null;
+    renderHand();
+    return;
+  }
+  S.selectedCard = card;
+  renderHand();
+  const nextSlot = S.chain.length;
+  const maxLen = S.cycle === 1 ? 5 : 6;
+  if (nextSlot >= maxLen) return;
+  attemptPlace(card, nextSlot);
+}
+
+function attemptPlace(card, slotIdx) {
+  const prev = slotIdx > 0 ? S.chain[slotIdx - 1] : null;
+  if (prev && prev.right !== card.left) {
+    S.pendingPlace = { card, slotIdx };
+    document.getElementById('force-overlay').classList.add('show');
+  } else {
+    placeCard(card, slotIdx, false);
+  }
+}
+
+function placeCard(card, slotIdx, forced) {
+  const prev = slotIdx > 0 ? S.chain[slotIdx - 1] : null;
+  const mismatch = prev && prev.right !== card.left;
+  if (mismatch && forced) S.mismatches++;
+  S.chain.push({...card, _mismatch: mismatch && forced});
+  S.selectedCard = null;
+  renderChain();
+  renderHand();
+}
+
+/* ════════════════════════════════════════════════
+   SUBMIT
+════════════════════════════════════════════════ */
+function submitChain() {
+  const colors = Object.values(SC).map(c =>
+    c.replace('var(--c-','').replace(')','')
+  );
+  const cssColors = ['#5ecfc0','#f4a040','#e85050','#90c8e0','#e8c040','#c070f0','#7a6040','#304878'];
+  const collage = document.getElementById('submit-collage');
+  collage.innerHTML = S.chain.map(() => {
+    const c = cssColors[Math.floor(Math.random()*cssColors.length)];
+    const w = 55 + Math.random()*50;
+    const h = 35 + Math.random()*30;
+    return `<div class="col-block" style="width:${w}px;height:${h}px;background:${c};opacity:0.65"></div>`;
+  }).join('');
+  showScreen('submit');
+  setTimeout(() => {
+    computeScores();
+    showFeedback();
+  }, 1600);
+}
+
+/* ════════════════════════════════════════════════
+   SCORING
+════════════════════════════════════════════════ */
+function computeScores() {
+  const chain = S.chain;
+  const brief = S.brief;
+  const secret = S.briefSecret;
+  const len = chain.length;
+
+  // Legibility
+  let leg = 0;
+  brief.forEach((bSym, i) => {
+    const card = chain[i];
+    if (!card) { leg -= 10; return; }
+    if (bSym !== null) {
+      if (card.left === bSym || card.right === bSym) leg += 20;
+    } else {
+      const s = secret[i];
+      if (card.left === s || card.right === s) leg += 15;
+      else leg -= 10;
+    }
+  });
+  const nTrans  = chain.filter(c=>c.origin==='translated').length;
+  const nFusion = chain.filter(c=>c.origin==='fusion').length;
+  leg += nTrans * 5 + nFusion * 10;
+  leg = clamp(leg, 0, 100);
+
+  // Voice
+  let voice = 0;
+  const nNative = chain.filter(c=>c.origin==='native').length;
+  voice += nNative * 12;
+  if (chain[0]    && chain[0].origin === 'native') voice += 15;
+  if (chain[len-1] && chain[len-1].origin === 'native') voice += 15;
+  const midIdx = Math.floor(len / 2);
+  if (chain[midIdx] && chain[midIdx].origin === 'native') voice += 10;
+  voice += nFusion * 15;
+  voice = clamp(voice, 0, 100);
+
+  // Coherence
+  const coherence = clamp(100 - S.mismatches * 25, 0, 100);
+
+  S.scores = { legibility: leg, voice, coherence };
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function tier(v) { return v >= 70 ? 'hi' : v >= 40 ? 'mid' : 'lo'; }
+
+/* ════════════════════════════════════════════════
+   FEEDBACK
+════════════════════════════════════════════════ */
+function showFeedback() {
+  document.getElementById('fb-cycle-label').textContent = `Cycle ${S.cycle} Feedback`;
+  const prev = S.prevScores;
+  const axes = [
+    { key:'legibility', label:'Legibility' },
+    { key:'voice',      label:'Voice'      },
+    { key:'coherence',  label:'Coherence'  },
+  ];
+  document.getElementById('fb-lines').innerHTML = axes.map(ax => {
+    const sc  = S.scores[ax.key];
+    const t   = tier(sc);
+    const txt = FB[ax.key][t];
+    let compare = '';
+    if (prev && S.cycle === 2) {
+      const tiers = ['lo','mid','hi'];
+      const d = tiers.indexOf(t) - tiers.indexOf(tier(prev[ax.key]));
+      if (d > 0) compare = `Compared to last time — ${ax.label} is sharper now.`;
+      else if (d < 0) compare = `Compared to last time — ${ax.label} feels less here.`;
+    }
+    return `
+      <div class="fb-line ${t}">
+        <div class="fb-axis">${ax.label}</div>
+        <div class="fb-text">"${txt}"</div>
+        ${compare ? `<div class="fb-compare">${compare}</div>` : ''}
+      </div>`;
+  }).join('');
+  showScreen('feedback');
+}
+
+/* ════════════════════════════════════════════════
+   DECK DECISION
+════════════════════════════════════════════════ */
+function startDecision() {
+  // Normalise deck to exactly 11 cards
+  const usedNames = new Set(S.deck.map(c=>c.name));
+  while (S.deck.length < 11) {
+    const name = pickTransName(usedNames);
+    usedNames.add(name);
+    const l = SYMBOLS[Math.floor(Math.random()*SYMBOLS.length)];
+    const r = weightedSym([l], l);
+    S.deck.push({ id:'tx_'+Date.now()+'_'+Math.random().toString(36).slice(2,4), name, left:l, right:r, origin:'translated', memory:null });
+  }
+  while (S.deck.length > 11) {
+    // trim latest translated card
+    for (let i = S.deck.length-1; i >= 0; i--) {
+      if (S.deck[i].origin === 'translated') { S.deck.splice(i,1); break; }
+    }
+    if (S.deck.every(c=>c.origin!=='translated')) break; // safety
+  }
+
+  S.decSelA = null;
+  S.decSelB = null;
+  renderDecision();
+  showScreen('decision');
+}
+
+function renderDecision() {
+  const cont = document.getElementById('dec-cards');
+  cont.innerHTML = '';
+  S.deck.forEach(card => {
+    const wrap = document.createElement('div');
+    wrap.className = 'dec-card-wrap';
+    wrap.dataset.id = card.id;
+    const el = buildCardEl(card, false);
+    wrap.appendChild(el);
+    el.addEventListener('click', () => decSelectCard(card.id));
+    cont.appendChild(wrap);
+  });
+  updateDecButtons();
+}
+
+function decSelectCard(id) {
+  if (S.decSelA && S.decSelA.id === id) { S.decSelA = null; }
+  else if (S.decSelB && S.decSelB.id === id) { S.decSelB = null; }
+  else if (!S.decSelA) { S.decSelA = S.deck.find(c=>c.id===id); }
+  else if (!S.decSelB) { S.decSelB = S.deck.find(c=>c.id===id); }
+  else { S.decSelA = S.deck.find(c=>c.id===id); S.decSelB = null; }
+
+  document.querySelectorAll('.dec-card-wrap').forEach(w => {
+    w.classList.remove('sel-a','sel-b');
+    if (S.decSelA && w.dataset.id === S.decSelA.id) w.classList.add('sel-a');
+    if (S.decSelB && w.dataset.id === S.decSelB.id) w.classList.add('sel-b');
+  });
+  updateDecButtons();
+}
+
+function updateDecButtons() {
+  const a = S.decSelA, b = S.decSelB;
+  document.getElementById('btn-discard').disabled = !a || !!b;
+  document.getElementById('btn-keep').disabled    = !a || !!b || a.origin !== 'translated';
+
+  let fuseOk = false, fuseHint = 'Select 1 native + 1 translated that share a symbol.';
+  if (a && b) {
+    const hasN = a.origin==='native' || b.origin==='native';
+    const hasT = a.origin==='translated' || b.origin==='translated';
+    if (hasN && hasT) {
+      const symsA = [a.left, a.right], symsB = [b.left, b.right];
+      const shared = symsA.some(s => symsB.includes(s));
+      if (shared) { fuseOk = true; fuseHint = 'Ready to fuse.'; }
+      else fuseHint = "These don't share enough to fuse.";
+    } else fuseHint = 'You need 1 native + 1 translated card.';
+  }
+  document.getElementById('btn-fuse').disabled = !fuseOk;
+  document.getElementById('fuse-hint').textContent = fuseHint;
+}
+
+function doDiscard() {
+  const card = S.decSelA;
+  if (!card) return;
+  if (card.origin === 'native' && card.memory) {
+    document.getElementById('memory-text').textContent = card.memory;
+    document.getElementById('memory-overlay').classList.add('show');
+    setTimeout(() => document.getElementById('memory-overlay').classList.remove('show'), 2200);
+    setTimeout(() => startLecture(2), 2400);
+  } else {
+    startLecture(2);
+  }
+  S.deck = S.deck.filter(c=>c.id!==card.id);
+}
+
+function doKeep() {
+  const card = S.decSelA;
+  if (!card || card.origin !== 'translated') return;
+  S.deck = S.deck.filter(c=>c.id!==card.id);
+  S.keepPenalty = true;
+  startLecture(2);
+}
+
+function doFuse() {
+  const a = S.decSelA, b = S.decSelB;
+  if (!a || !b) return;
+  const nat  = a.origin === 'native' ? a : b;
+  const tran = a.origin === 'translated' ? a : b;
+  const natSyms  = [nat.left,  nat.right];
+  const tranSyms = [tran.left, tran.right];
+
+  const natUnshared  = natSyms.filter(s => !tranSyms.includes(s));
+  const tranUnshared = tranSyms.filter(s => !natSyms.includes(s));
+  const fusedLeft  = natUnshared[0]  || nat.left;
+  const fusedRight = tranUnshared[0] || tran.right;
+
+  const fused = {
+    id: 'fu_'+Date.now(),
+    name: nat.name + ' / ' + tran.name,
+    left: fusedLeft, right: fusedRight,
+    origin: 'fusion', memory: nat.memory,
+  };
+  S.deck = S.deck.filter(c=>c.id!==a.id && c.id!==b.id);
+  S.deck.push(fused);
+  startLecture(2);
+}
+
+/* ════════════════════════════════════════════════
+   INIT & EVENT WIRING
+════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  initState();
+  setupPortraits();
+
+  // Title
+  document.getElementById('btn-begin').addEventListener('click', () => {
+    showScreen('tutorial');
+    renderTutorial();
+  });
+
+  // Brief
+  document.getElementById('btn-begin-assign').addEventListener('click', startAssign);
+
+  // Assignment
+  document.getElementById('btn-undo').addEventListener('click', undoLast);
+  document.getElementById('btn-submit').addEventListener('click', submitChain);
+  document.addEventListener('keydown', e => {
+    if (e.key.toLowerCase() === 'z' && S.screen === 'assign') undoLast();
+  });
+
+  // Force dialog
+  document.getElementById('btn-force-yes').addEventListener('click', () => {
+    document.getElementById('force-overlay').classList.remove('show');
+    if (S.pendingPlace) {
+      placeCard(S.pendingPlace.card, S.pendingPlace.slotIdx, true);
+      S.pendingPlace = null;
+    }
+    S.selectedCard = null;
+  });
+  document.getElementById('btn-force-no').addEventListener('click', () => {
+    document.getElementById('force-overlay').classList.remove('show');
+    S.pendingPlace = null;
+    S.selectedCard = null;
+    renderHand();
+  });
+
+  // Feedback
+  document.getElementById('btn-fb-next').addEventListener('click', () => {
+    if (S.cycle === 1) {
+      S.prevScores = {...S.scores};
+      startDecision();
+    } else {
+      showScreen('end');
+    }
+  });
+
+  // Decision
+  document.getElementById('btn-discard').addEventListener('click', doDiscard);
+  document.getElementById('btn-keep').addEventListener('click', doKeep);
+  document.getElementById('btn-fuse').addEventListener('click', doFuse);
+
+  // Restart
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    initState();
+    setupPortraits();
+    showScreen('title');
+  });
+});
+
+function undoLast() {
+  if (S.chain.length === 0) return;
+  const removed = S.chain.pop();
+  if (removed._mismatch) S.mismatches = Math.max(0, S.mismatches - 1);
+  S.selectedCard = null;
+  renderChain();
+  renderHand();
+}
+</script>
+</body>
+</html>
