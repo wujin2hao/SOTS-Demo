@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>留学生双地粉丝 Blogger 卡牌选择机制</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #0a0a10;
+  --surface:   #141420;
+  --surface2:  #1c1c2a;
+  --border:    #2e2e42;
+  --border-hi: #4a4a68;
+  --text:      #e6e0d0;
+  --dim:       #6a6a88;
+  --accent:    #c8a878;
+  --green:     #5ecf90;
+  --red:       #e85050;
+  --blue:      #5ecfc0;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+}
+#app { max-width: 860px; margin: 0 auto; padding: 24px 20px 60px; }
+
+/* ── Header ── */
+#hdr {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+#day-label  { font-size: 1.05rem; font-weight: 600; color: var(--accent); min-width: 110px; }
+#phase-tag  { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); }
+#energy-row { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+.edot       { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+.edot.spent { background: var(--border); }
+#energy-num { font-size: .8rem; color: var(--dim); margin-left: 4px; }
+
+/* ── Log ── */
+#log {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 9px 14px; margin-bottom: 18px;
+  font-size: .875rem; color: var(--dim); line-height: 1.55; min-height: 40px;
+}
+
+/* ── Action area ── */
+#action-area { margin-bottom: 22px; }
+.area-title {
+  font-size: .75rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--dim); margin-bottom: 10px;
+}
+.btn-row { display: flex; flex-wrap: wrap; gap: 9px; }
+
+/* ── Generic buttons ── */
+.btn {
+  padding: 8px 18px; border: 1px solid var(--border-hi);
+  background: transparent; color: var(--text); cursor: pointer;
+  border-radius: 4px; font-size: .875rem;
+  transition: background .13s, border-color .13s;
+}
+.btn:hover:not(:disabled) { background: rgba(255,255,255,.05); border-color: var(--accent); }
+.btn:disabled  { opacity: .32; cursor: not-allowed; }
+.btn.hi        { border-color: var(--accent); color: var(--accent); }
+.btn.hi:hover:not(:disabled) { background: rgba(200,168,120,.1); }
+.btn.dim       { border-color: var(--dim); color: var(--dim); }
+.btn.dim:hover:not(:disabled) { border-color: var(--text); color: var(--text); background: rgba(255,255,255,.03); }
+
+/* ── Location buttons ── */
+.loc-section { margin-bottom: 14px; }
+.loc-section-label { font-size: .73rem; text-transform: uppercase; letter-spacing: .07em; color: var(--dim); margin-bottom: 6px; }
+.loc-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.loc-btn {
+  display: flex; flex-direction: column; align-items: flex-start;
+  padding: 10px 14px; min-width: 150px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); cursor: pointer; border-radius: 6px;
+  font-size: .875rem; text-align: left;
+  transition: border-color .13s, background .13s;
+}
+.loc-btn:hover:not(:disabled) { border-color: var(--border-hi); background: var(--surface2); }
+.loc-btn:disabled { opacity: .32; cursor: not-allowed; }
+.loc-btn .li { font-size: 1.15rem; margin-bottom: 3px; }
+.loc-btn .ln { font-weight: 500; }
+.loc-btn .lc { font-size: .73rem; color: var(--dim); margin-top: 1px; }
+.loc-btn .ly { font-size: .73rem; color: var(--green); margin-top: 1px; }
+
+/* ── Brief pill ── */
+#brief-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 20px; padding: 5px 14px; font-size: .83rem;
+  margin-bottom: 14px; color: var(--dim);
+}
+#brief-pill strong { color: var(--accent); font-size: 1.1rem; }
+
+/* ── Separator ── */
+.sep { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+/* ── Deck ── */
+#deck-hdr { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+#deck-hdr .area-title { margin-bottom: 0; }
+#deck-cap { font-size: .8rem; color: var(--dim); }
+#deck-cap.full { color: var(--red); }
+.deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 8px; }
+
+/* ── Cards ── */
+.card {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 10px; background: var(--surface); position: relative;
+}
+.card.native   { border-color: #3a3050; }
+.card.abstract { border-color: #2a3a50; }
+.card.fusion   { border-color: #3a4a2a; border-width: 2px; }
+.card.empty    { border-style: dashed; background: transparent; opacity: .35; }
+.card.failed-forced {
+  border: 2px dashed var(--red) !important;
+  background: rgba(232,80,80,.06) !important;
+  outline: 2px solid #e87820;
+  outline-offset: 3px;
+}
+.card.selectable { cursor: pointer; transition: border-color .13s, background .13s; }
+.card.selectable:hover { border-color: var(--accent); background: var(--surface2); }
+.card.selected { border-color: var(--accent); background: rgba(200,168,120,.07); box-shadow: 0 0 0 1px var(--accent); }
+.card .c-sym  { font-size: 1.3rem; margin-bottom: 3px; }
+.card .c-name { font-size: .78rem; font-weight: 600; line-height: 1.3; margin-bottom: 2px; }
+.card .c-type { font-size: .67rem; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); }
+.card .c-tag  { font-size: .72rem; color: var(--dim); margin-top: 3px; }
+.card .c-mem  { font-size: .7rem; color: var(--dim); margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--border); line-height: 1.4; }
+
+/* ── Homework ── */
+#hw-area { display: none; margin-bottom: 20px; }
+#hw-brief { margin-bottom: 10px; }
+#hw-brief .sym { font-size: 2rem; color: var(--accent); }
+.hw-info { font-size: .83rem; color: var(--dim); margin-bottom: 10px; }
+#hw-selection {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  min-height: 38px; padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface); margin-bottom: 12px;
+}
+.hw-tag {
+  background: var(--surface2); border: 1px solid var(--border-hi);
+  border-radius: 3px; padding: 3px 8px; font-size: .78rem;
+}
+
+/* ── Feedback ── */
+#fb-area { display: none; margin-bottom: 20px; }
+.fb-grade { font-size: 1.8rem; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.fb-quote { font-size: .95rem; line-height: 1.7; margin-bottom: 14px; color: var(--text); font-style: italic; }
+.fb-detail {
+  font-size: .8rem; line-height: 1.65; color: var(--dim);
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px 14px; margin-bottom: 14px;
+  white-space: pre-wrap; font-family: 'Courier New', monospace;
+}
+
+/* ── End ── */
+#end-area { display: none; text-align: center; padding: 48px 20px; }
+#end-area h2 { font-size: 1.6rem; color: var(--accent); margin-bottom: 10px; }
+#end-area p  { font-size: .95rem; color: var(--dim); max-width: 480px; margin: 0 auto 24px; line-height: 1.7; }
+
+/* ── Modals (shared overlay) ── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.72); z-index: 200;
+  overflow-y: auto; padding: 40px 20px;
+  align-items: flex-start; justify-content: center;
+}
+.overlay.open { display: flex; }
+.modal-box {
+  background: var(--surface); border: 1px solid var(--border-hi);
+  border-radius: 10px; padding: 26px; max-width: 740px; width: 100%;
+}
+.modal-box h2 { font-size: 1rem; color: var(--accent); margin-bottom: 6px; }
+.modal-box p  { font-size: .85rem; color: var(--dim); margin-bottom: 16px; line-height: 1.5; }
+.modal-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+/* ── Discard Modal ── */
+#discard-hint { font-size: .8rem; color: var(--dim); margin-top: 12px; }
+
+/* ── Incompatible card (synthesis modal) ── */
+.card.incompatible {
+  opacity: .28; cursor: not-allowed;
+  /* suppress hover styles */
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+}
+
+/* ── Synthesis Modal ── */
+#synth-columns {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px;
+}
+.synth-col-label {
+  font-size: .73rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--dim); margin-bottom: 8px;
+}
+#synth-preview {
+  font-size: .85rem; color: var(--dim);
+  min-height: 22px; padding: 6px 10px;
+  border: 1px solid var(--border); border-radius: 4px; background: var(--surface2);
+}
+#synth-preview.ready    { color: var(--accent); border-color: var(--accent); }
+#synth-preview.mismatch { color: var(--red);    border-color: var(--red); }
+
+/* ── Memory Flash ── */
+#mem-flash {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.88);
+  align-items: center; justify-content: center; text-align: center;
+  padding: 40px;
+}
+#mem-flash.open { display: flex; }
+#mem-flash p {
+  font-size: 1.1rem; color: var(--text); max-width: 480px;
+  line-height: 1.7; font-family: Georgia, serif; font-style: italic;
+}
+
+
+/* ── Blogger Opening Selection / Abstract Swap ── */
+.setup-note {
+  font-size: .86rem; color: var(--dim); line-height: 1.6;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;
+}
+.setup-topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.setup-count { color: var(--accent); font-weight: 700; }
+.card.locked { opacity:.45; cursor:not-allowed; }
+.abstract-card-preview {
+  border:1px solid var(--blue); background: rgba(94,207,192,.07);
+  border-radius:8px; padding:14px; margin: 12px 0;
+}
+.abstract-card-preview .big { font-size:1.8rem; margin-bottom:4px; }
+.abstract-card-preview .name { font-weight:700; color:var(--accent); }
+.abstract-card-preview .desc { color:var(--dim); font-size:.82rem; margin-top:4px; line-height:1.5; }
+
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Header -->
+  <div id="hdr">
+    <span id="day-label">Day 1 · Mon</span>
+    <span id="phase-tag">Morning</span>
+    <div id="energy-row"></div>
+    <span id="energy-num"></span>
+  </div>
+
+  <!-- Log line -->
+  <div id="log"></div>
+
+  <!-- Action area (rebuilt each render) -->
+  <div id="action-area"></div>
+
+  <!-- Homework (Day 5) -->
+  <div id="hw-area">
+    <div class="area-title">📐 Weekly Assignment — Due Today</div>
+    <div id="hw-brief"></div>
+    <div class="hw-info" id="hw-info">Select 4 cards from your deck below.</div>
+    <div id="hw-selection"><span style="color:var(--dim);font-size:.82rem">No cards selected</span></div>
+    <button class="btn hi" id="hw-submit" disabled>Submit Assignment</button>
+  </div>
+
+  <!-- Feedback -->
+  <div id="fb-area">
+    <div class="area-title">Dr. Hollow's Feedback</div>
+    <div class="fb-grade" id="fb-grade"></div>
+    <div class="fb-quote" id="fb-quote"></div>
+    <div class="fb-detail" id="fb-detail"></div>
+    <button class="btn" id="fb-next">Continue →</button>
+  </div>
+
+  <!-- End screen -->
+  <div id="end-area">
+    <h2 id="end-title">End of Week</h2>
+    <p  id="end-body"></p>
+    <button class="btn hi" onclick="location.reload()">↺  Start Over</button>
+  </div>
+
+  <hr class="sep">
+
+  <!-- Deck -->
+  <div id="deck-section">
+    <div id="deck-hdr">
+      <div class="area-title">Deck</div>
+      <span id="deck-cap">0 / 10</span>
+    </div>
+    <div class="deck-grid" id="deck-grid"></div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Discard Modal -->
+<div class="overlay" id="modal-discard">
+  <div class="modal-box">
+    <h2>Deck Full (10 / 10)</h2>
+    <p id="discard-prompt"></p>
+    <div class="deck-grid" id="discard-grid"></div>
+    <div id="discard-hint">↑ Click a card above to discard it and make room for the new card.</div>
+  </div>
+</div>
+
+<!-- Synthesis Modal -->
+<div class="overlay" id="modal-synth">
+  <div class="modal-box">
+    <h2>📐 Synthesize — Choose a Pair</h2>
+    <p>Select one abstract and one concrete card. If the concrete's <strong>contour</strong> matches the abstract's symbol → Fusion card. If not → Failed card (强行套壳卡, −10 pts on submission). All pairs are selectable — the outcome is shown in the preview below.</p>
+    <div id="synth-columns">
+      <div>
+        <div class="synth-col-label">Abstract cards in deck</div>
+        <div class="deck-grid" id="synth-abstract-grid"></div>
+      </div>
+      <div>
+        <div class="synth-col-label">Concrete cards in deck</div>
+        <div class="deck-grid" id="synth-concrete-grid"></div>
+      </div>
+    </div>
+    <div id="synth-preview">Select one abstract and one concrete card to preview the fusion.</div>
+    <div class="modal-actions">
+      <button class="btn hi" id="synth-confirm" disabled>Fuse  (−5 energy)</button>
+      <button class="btn dim" id="synth-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Memory Flash -->
+<div id="mem-flash">
+  <p id="mem-text"></p>
+</div>
+
+  <!-- Telephone Swap Modal -->
+  <div class="overlay" id="modal-phone">
+    <div class="modal-box">
+      <h2>📞 聊天事件 — 父母 / 朋友</h2>
+      <!-- Description text updates based on step and caller -->
+      <p id="phone-step-desc">选择聊天对象。父母固定 3 轮并在结束后统一结算；朋友最多 3 轮，每次打开都会随机刷新问题，匹配度过低会提前结束。</p>
+      <!-- Step 1: choose caller -->
+      <div id="phone-person-section">
+        <div class="btn-row">
+          <button class="btn" data-person="dad" title="与爸爸聊天：固定 3 轮，围绕天气、交通、特别知识作答。">👨‍💼 爸爸</button>
+          <button class="btn" data-person="mom" title="与妈妈聊天：固定 3 轮，围绕饮食、天气、多喝水作答。">👩‍🍳 妈妈</button>
+          <button class="btn" data-person="friend" title="与朋友聊天：最多 3 轮，每轮至少 2 张卡；匹配度低于 70% 会吞掉本轮卡牌并提前结束。">🧑‍🤝‍🧑 朋友</button>
+        </div>
+      </div>
+      <!-- Step 2: choose cards -->
+      <div id="phone-card-section" style="display:none;">
+        <p id="phone-card-instructions" style="font-size:.85rem;color:var(--dim);margin-bottom:8px;">选择卡牌作答：父母每轮可提交 1–3 张，三轮累计需至少 1 张具象卡 + 1 张抽象卡；朋友每轮至少 2 张。</p>
+        <div class="deck-grid" id="phone-card-grid"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn hi" id="phone-next-round" style="display:none;">继续下一轮</button>
+        <button class="btn hi" id="phone-finish" style="display:none;">提交本轮回答</button>
+        <button class="btn dim" id="phone-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Internet Search Modal -->
+  <div class="overlay" id="modal-net">
+    <div class="modal-box">
+      <h2>💻 Online Search — Search Bundle</h2>
+      <!-- Step description will be updated dynamically -->
+      <p id="net-step-desc" style="font-size:.85rem;color:var(--dim);margin-bottom:8px;">选择一个方向开始检索。本次上网将一次性投入 2~5 张卡。</p>
+      <!-- Step 1: choose search direction -->
+      <div id="net-direction-section">
+        <div class="btn-row">
+          <button class="btn" data-direction="events" title="本地活动：目标是活动准备相关复合卡。推荐投：2张具象+1张抽象">🏮 本地活动</button>
+          <button class="btn" data-direction="shopping" title="日常购物：目标是购物清单相关复合卡。推荐投：2张具象+1张抽象">🛒 日常购物</button>
+          <button class="btn" data-direction="transit" title="城市出行：目标是路线规划相关复合卡。推荐投：2张具象+1张抽象">🚇 城市出行</button>
+        </div>
+      </div>
+      <!-- Step 2: select cards and confirm -->
+      <div id="net-card-section" style="display:none;">
+        <label style="display:flex;align-items:center;font-size:.78rem;color:var(--dim);margin-bottom:10px;">
+          <input type="checkbox" id="net-validate" style="margin-right:6px;">
+          Validate (减少“全损”概率)
+        </label>
+        <p id="net-risk" style="font-size:.78rem;color:var(--dim);margin-bottom:8px;"></p>
+        <div class="deck-grid" id="net-card-grid"></div>
+        <div class="modal-actions">
+          <button class="btn hi" id="net-confirm" disabled>Search</button>
+          <button class="btn dim" id="net-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════════════ */
+
+const SYMBOLS = ['◻','⚪','△','◇','✚','⬡'];
+
+// Blogger abstract card rounds — added after the player chooses 10 concrete cards
+const ABSTRACT_POOL = [
+  { sym:'⚪', name:'Connection / Belonging', cn:'连接 / 归属感', round:1, desc:'国外语言层：把母语记忆与新城市生活连接起来。' },
+  { sym:'◻', name:'Structure / Daily System', cn:'结构 / 日常系统', round:2, desc:'国外语言层：把交通、学习、生活规则整理成可执行的日常系统。' },
+  { sym:'△', name:'Growth / Direction', cn:'成长 / 方向', round:3, desc:'国外语言层：从适应走向成长，形成新的生活方向。' },
+];
+
+// 20 native concrete cards — first screen lays all of them out for the player to choose 10.
+const NATIVE_CARDS = [
+  { id:'n1',  type:'concrete', origin:'native', sym:'🧺', name:'竹蒸笼',   tag:'⚪', contour:'⚪', memory:'蒸汽从竹蒸笼缝隙里冒出来，像母语里最熟悉的早晨。' },
+  { id:'n2',  type:'concrete', origin:'native', sym:'🪧', name:'霓虹招牌', tag:'◻', contour:'◻', memory:'街角的霓虹招牌亮起来，城市开始有了自己的节奏。' },
+  { id:'n3',  type:'concrete', origin:'native', sym:'🦁', name:'醒狮狮头', tag:'⚪', contour:'⚪', memory:'鼓点响起时，醒狮抬头，热闹像从家乡扑面而来。' },
+  { id:'n4',  type:'concrete', origin:'native', sym:'🪪', name:'工厂工牌', tag:'◻', contour:'◻', memory:'一张工牌记录着劳动、身份和每天重复的生活秩序。' },
+  { id:'n5',  type:'concrete', origin:'native', sym:'🫖', name:'工夫茶茶具', tag:'⚪', contour:'⚪', memory:'茶杯很小，但一句“饮茶啦”可以把距离拉近。' },
+  { id:'n6',  type:'concrete', origin:'native', sym:'🎭', name:'英歌舞脸谱', tag:'⚪', contour:'⚪', memory:'脸谱的颜色和动作，把地方记忆变成可以被看见的节奏。' },
+  { id:'n7',  type:'concrete', origin:'native', sym:'🫐', name:'荔枝',     tag:'⚪', contour:'⚪', memory:'剥开荔枝的瞬间，甜味像夏天一样涌出来。' },
+  { id:'n8',  type:'concrete', origin:'native', sym:'🦪', name:'炭烤生蚝', tag:'△', contour:'△', memory:'炭火、蒜蓉和海味混在一起，是夜市里很直接的快乐。' },
+  { id:'n9',  type:'concrete', origin:'native', sym:'🍗', name:'白切鸡',   tag:'△', contour:'△', memory:'白切鸡蘸上姜葱酱，熟悉感不需要翻译。' },
+  { id:'n10', type:'concrete', origin:'native', sym:'🍶', name:'客家娘酒', tag:'⚪', contour:'⚪', memory:'娘酒的温热感，像家里长辈含蓄的照顾。' },
+  { id:'n11', type:'concrete', origin:'native', sym:'🕊️', name:'乳鸽',     tag:'△', contour:'△', memory:'热气腾腾的乳鸽端上桌，节日感一下子出现。' },
+  { id:'n12', type:'concrete', origin:'native', sym:'🗽', name:'渔女雕像', tag:'△', contour:'△', memory:'海边的雕像像一个地标，也像离开前记住城市的方式。' },
+  { id:'n13', type:'concrete', origin:'native', sym:'🧧', name:'利是',     tag:'◻', contour:'◻', memory:'薄薄的红包装着祝福，也装着人与人之间的关系。' },
+  { id:'n14', type:'concrete', origin:'native', sym:'🚌', name:'巴士',     tag:'◻', contour:'◻', memory:'巴士路线把城市切成一段一段可以理解的日常。' },
+  { id:'n15', type:'concrete', origin:'native', sym:'☂️', name:'雨伞',     tag:'△', contour:'△', memory:'雨伞撑开的瞬间，陌生天气也变得可以应对。' },
+  { id:'n16', type:'concrete', origin:'native', sym:'🥧', name:'蛋挞',     tag:'△', contour:'△', memory:'蛋挞的酥皮和奶香，是街边小店里很具体的安慰。' },
+  { id:'n17', type:'concrete', origin:'native', sym:'👕', name:'衣服',     tag:'△', contour:'△', memory:'多带一件衣服，是家人对天气和你的双重担心。' },
+  { id:'n18', type:'concrete', origin:'native', sym:'🥣', name:'口盅',     tag:'⚪', contour:'⚪', memory:'一个小小的口盅，装的是汤，也是家里的生活方式。' },
+  { id:'n19', type:'concrete', origin:'native', sym:'🚕', name:'的士',     tag:'△', contour:'△', memory:'坐上的士，窗外的街景快速后退，城市变成移动的片段。' },
+  { id:'n20', type:'concrete', origin:'native', sym:'🩳', name:'短裤',     tag:'△', contour:'△', memory:'短裤代表湿热的天气，也代表对地方气候的身体记忆。' },
+];
+
+// Location-specific concrete card pools
+const CONCRETE_POOLS = {
+  telephone: [
+    { sym:'📞', name:'妈妈的声音',   tag:'⚪', contour:'⚪', memory:'她说最近变冷了，让你多穿点' },
+    { sym:'🏠', name:'家里的猫',     tag:'△', contour:'△', memory:'爸说猫最近老蹲在你房间门口' },
+    { sym:'🍜', name:'周末的饭桌',   tag:'⚪', contour:'⚪', memory:'外婆做了你最喜欢的糖醋排骨' },
+    { sym:'📮', name:'寄来的包裹',   tag:'◻', contour:'◻', memory:'妈说寄了秋衣，应该这两天到' },
+    { sym:'📸', name:'家里的老照片', tag:'◇', contour:'◇', memory:'妈翻到了你小学毕业照，说你那时候留着刘海' },
+  ],
+  internet: [
+    { sym:'🔗', name:'Algorithm Feed',         tag:'◻', contour:'◻', memory:null },
+    { sym:'📱', name:'Random Short Video',      tag:'⚪', contour:'⚪', memory:null },
+    { sym:'🖼', name:'Reference Image',         tag:'△', contour:'△', memory:null },
+    { sym:'💬', name:'Forum Stranger',          tag:'◇', contour:'◇', memory:null },
+    { sym:'🌐', name:'Wikipedia Rabbit Hole',   tag:'◻', contour:'◻', memory:null },
+  ],
+  lake: [
+    { sym:'🌊', name:'Light on the Lake',    tag:'◻', contour:'◻', memory:null },
+    { sym:'🦆', name:'Ducks at the Margin',  tag:'⚪', contour:'⚪', memory:null },
+    { sym:'🌿', name:'Grass at the Bank',    tag:'△', contour:'△', memory:null },
+    { sym:'🪨', name:'Stones in the Water',  tag:'◇', contour:'◇', memory:null },
+  ],
+  lawn: [
+    { sym:'👥', name:'Crowd on the Grass',        tag:'△', contour:'△', memory:null },
+    { sym:'🐕', name:'Old Man Walking His Dog',   tag:'⚪', contour:'⚪', memory:null },
+    { sym:'⚽', name:'Students Playing Football', tag:'◻', contour:'◻', memory:null },
+    { sym:'🌸', name:'Blossoming Tree',           tag:'◇', contour:'◇', memory:null },
+  ],
+};
+
+const DAY_NAMES = ['','Mon','Tue','Wed','Thu','Fri'];
+
+/* ═══════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════ */
+
+const DECK_MAX = 10;
+const CYCLE_DAYS = 5;
+
+let _nextId = 200;
+const uid = () => `c${_nextId++}`;
+
+const STATE = {
+  day:           1,
+  phase:         'setup',  // 'setup' | 'abstractSwap' | 'morning' | 'afternoon' | 'done'
+  classAttended: false,
+  energy:        15,
+
+  // Deck: starts empty. Player chooses 10 cards from the 20 concrete cards first.
+  deck: [],
+  selectedNative: [],
+  abstractRound: 0,
+  currentAbstractCard: null,
+  waitingDiscardForAbstract: false,
+
+  // Queue: cards waiting to be added (may need discard first)
+  pendingQueue:  [],
+  queueRunning:  false,
+
+  // Homework
+  hwActive:      false,
+  hwSelected:    [],   // card ids
+  briefSymbol:   SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)],
+
+  // Prevent re-use of same abstract / concrete cards too quickly
+  usedAbstract:  new Set(),
+  usedConcrete:  { telephone:[], internet:[], lake:[], lawn:[] },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════════════ */
+
+function rand(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function pickAbstract() {
+  const index = Math.max(0, Math.min(STATE.abstractRound - 1, ABSTRACT_POOL.length - 1));
+  const t = ABSTRACT_POOL[index];
+  return { id: uid(), type:'abstract', origin:'class', sym: t.sym, name: t.name, cn: t.cn, round: t.round, tag: t.sym, contour: t.sym, memory: t.desc || null };
+}
+
+function pickConcrete(src) {
+  const pool = CONCRETE_POOLS[src];
+  const used = STATE.usedConcrete[src];
+  const fresh = pool.filter(c => !used.includes(c.name));
+  const t = fresh.length ? rand(fresh) : rand(pool);
+  STATE.usedConcrete[src].push(t.name);
+  return { id: uid(), type:'concrete', origin: src, sym: t.sym, name: t.name, tag: t.tag, contour: t.contour || t.tag, memory: t.memory };
+}
+
+function hasEnergy(n) { return STATE.energy >= n; }
+function spend(n)     { STATE.energy = Math.max(0, STATE.energy - n); }
+
+const $log = () => document.getElementById('log');
+function setLog(t)    { $log().textContent = t; }
+function appendLog(t) { $log().textContent += ' ' + t; }
+
+/* ═══════════════════════════════════════════════════════════
+   CARD QUEUE — serialises adding cards even when discard modal
+   must interrupt in the middle of a batch (e.g. 5 class cards)
+═══════════════════════════════════════════════════════════ */
+
+function enqueue(cards, onAllDone) {
+  cards.forEach(c => STATE.pendingQueue.push(c));
+  STATE._queueDone = onAllDone || null;
+  drainQueue();
+}
+
+function drainQueue() {
+  if (STATE.queueRunning) return;
+  if (!STATE.pendingQueue.length) {
+    if (STATE._queueDone) { const fn = STATE._queueDone; STATE._queueDone = null; fn(); }
+    return;
+  }
+  STATE.queueRunning = true;
+  const card = STATE.pendingQueue.shift();
+  if (STATE.deck.length < DECK_MAX) {
+    STATE.deck.push(card);
+    renderDeck();
+    STATE.queueRunning = false;
+    drainQueue();
+  } else {
+    STATE._pendingNewCard = card;
+    openDiscardModal(card);
+    // queueRunning stays true until discardCard() resumes it
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DISCARD MODAL
+═══════════════════════════════════════════════════════════ */
+
+function openDiscardModal(newCard) {
+  document.getElementById('discard-prompt').innerHTML =
+    `New card incoming: <strong>${newCard.sym} ${newCard.name}</strong><br>
+     Your deck is at capacity (${DECK_MAX}/${DECK_MAX}). Choose one card to discard.`;
+  renderDiscardGrid();
+  document.getElementById('modal-discard').classList.add('open');
+}
+
+function renderDiscardGrid() {
+  const grid = document.getElementById('discard-grid');
+  grid.innerHTML = '';
+  STATE.deck.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    el.addEventListener('click', () => discardCard(card.id));
+    grid.appendChild(el);
+  });
+}
+
+function discardCard(id) {
+  const idx = STATE.deck.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  const gone = STATE.deck.splice(idx, 1)[0];
+  const arrived = STATE._pendingNewCard;
+  STATE._pendingNewCard = null;
+
+  document.getElementById('modal-discard').classList.remove('open');
+  STATE.deck.push(arrived);
+  renderDeck();
+  STATE.queueRunning = false;
+
+  const afterDiscard = () => {
+    appendLog(`Discarded "${gone.name}". Added "${arrived.sym} ${arrived.name}".`);
+    drainQueue();
+  };
+
+  if (gone.origin === 'native' && gone.memory) {
+    flashMemory(gone.memory, afterDiscard);
+  } else {
+    afterDiscard();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SYNTHESIS MODAL
+═══════════════════════════════════════════════════════════ */
+
+// Tracks which cards the player has selected in the synth modal
+let synthSel = { abstract: null, concrete: null };
+
+function openSynthModal() {
+  synthSel = { abstract: null, concrete: null };
+  renderSynthModal();
+  document.getElementById('modal-synth').classList.add('open');
+}
+
+function renderSynthModal() {
+  const aGrid = document.getElementById('synth-abstract-grid');
+  const cGrid = document.getElementById('synth-concrete-grid');
+  aGrid.innerHTML = '';
+  cGrid.innerHTML = '';
+
+  const abstracts = STATE.deck.filter(c => c.type === 'abstract');
+  const concretes = STATE.deck.filter(c => c.type === 'concrete');
+
+  // All pairs are allowed — contour vs sym determines success or failed card
+  abstracts.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (synthSel.abstract === card.id) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      synthSel.abstract = synthSel.abstract === card.id ? null : card.id;
+      renderSynthModal();
+    });
+    aGrid.appendChild(el);
+  });
+
+  concretes.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (synthSel.concrete === card.id) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      synthSel.concrete = synthSel.concrete === card.id ? null : card.id;
+      renderSynthModal();
+    });
+    cGrid.appendChild(el);
+  });
+
+  const preview    = document.getElementById('synth-preview');
+  const confirmBtn = document.getElementById('synth-confirm');
+
+  if (synthSel.abstract && synthSel.concrete) {
+    const a = STATE.deck.find(c => c.id === synthSel.abstract);
+    const b = STATE.deck.find(c => c.id === synthSel.concrete);
+    const compatible = b.contour === a.sym;
+    if (compatible) {
+      preview.textContent = `✓ Fusion: "${b.name} / ${a.name}"  ·  contour ${b.contour} = sym ${a.sym}  ·  ${b.memory ? 'carries memory' : 'no memory'}`;
+      preview.className = 'ready';
+    } else {
+      preview.textContent = `⚠ Mismatch: "${b.name}" (contour: ${b.contour}) ≠ "${a.name}" (sym: ${a.sym})  →  强行套壳卡 — produces a Failed card (−10 pts on submission)`;
+      preview.className = 'mismatch';
+    }
+    confirmBtn.disabled = false;
+  } else {
+    preview.textContent = 'Select one abstract and one concrete card to preview the outcome.';
+    preview.className = '';
+    confirmBtn.disabled = true;
+  }
+}
+
+function doConfirmSynth() {
+  if (!synthSel.abstract || !synthSel.concrete) return;
+  const a = STATE.deck.find(c => c.id === synthSel.abstract);
+  const b = STATE.deck.find(c => c.id === synthSel.concrete);
+  if (!a || !b) return;
+
+  spend(5);
+  // Remove both source cards before adding the result
+  STATE.deck = STATE.deck.filter(c => c.id !== a.id && c.id !== b.id);
+
+  const compatible = b.contour === a.sym;
+  let result;
+  if (compatible) {
+    result = {
+      id:      uid(),
+      type:    'fusion',
+      origin:  'homework',
+      sym:     b.sym + '+' + a.sym,
+      name:    b.name + ' / ' + a.name,
+      tag:     a.tag,
+      contour: a.sym,
+      memory:  b.memory || null,
+    };
+  } else {
+    result = {
+      id:      uid(),
+      type:    'failed-forced',
+      origin:  'homework',
+      sym:     b.sym + '⚡' + a.sym,
+      name:    b.name + ' ⚡ ' + a.name,
+      tag:     a.tag,
+      contour: null,
+      memory:  null,
+    };
+  }
+
+  document.getElementById('modal-synth').classList.remove('open');
+  if (compatible) {
+    setLog(`📐 Synthesized: "${b.name}" + "${a.name}"  →  Fusion "${result.name}"`);
+  } else {
+    setLog(`⚠ Failed synthesis: contour "${b.contour}" ≠ sym "${a.sym}"  →  强行套壳卡 "${result.name}" (−10 pts on submission)`);
+  }
+  renderDeck();
+  renderHeader();
+  enqueue([result], () => renderActions());
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MEMORY FLASH
+═══════════════════════════════════════════════════════════ */
+
+function flashMemory(text, cb) {
+  const el = document.getElementById('mem-flash');
+  document.getElementById('mem-text').textContent = `"${text}"`;
+  el.classList.add('open');
+  setTimeout(() => {
+    el.classList.remove('open');
+    if (cb) cb();
+  }, 2000);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER — ENERGY BAR
+═══════════════════════════════════════════════════════════ */
+
+function renderEnergy() {
+  const row = document.getElementById('energy-row');
+  const num = document.getElementById('energy-num');
+  row.innerHTML = '';
+  for (let i = 0; i < 15; i++) {
+    const d = document.createElement('div');
+    d.className = 'edot' + (i >= STATE.energy ? ' spent' : '');
+    row.appendChild(d);
+  }
+  num.textContent = `${STATE.energy} / 15`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER — DECK
+═══════════════════════════════════════════════════════════ */
+
+function makeCardEl(card) {
+  const ORIGIN_LABEL = {
+    native:'母语', class:'Lecture', telephone:'Telephone',
+    internet:'Internet', lake:'Park·Lake', lawn:'Park·Lawn', homework:'Synthesis',
+  };
+  const div = document.createElement('div');
+  let cls = 'card';
+  if (card.origin === 'native') cls += ' native';
+  else if (card.type === 'abstract') cls += ' abstract';
+  else if (card.type === 'fusion')        cls += ' fusion';
+  else if (card.type === 'failed-forced') cls += ' failed-forced';
+  div.className = cls;
+  div.dataset.id = card.id;
+
+  div.innerHTML =
+    `<div class="c-sym">${card.sym}</div>` +
+    `<div class="c-name">${card.name}</div>` +
+    `<div class="c-type">${card.type} · ${ORIGIN_LABEL[card.origin] || card.origin}</div>` +
+    `<div class="c-tag">tag: ${card.tag}</div>` +
+    (card.memory ? `<div class="c-mem">${card.memory}</div>` : '');
+
+  return div;
+}
+
+function renderDeck() {
+  const grid = document.getElementById('deck-grid');
+  const cap  = document.getElementById('deck-cap');
+  grid.innerHTML = '';
+
+  STATE.deck.forEach(card => {
+    const el = makeCardEl(card);
+    if (STATE.hwActive) {
+      el.classList.add('selectable');
+      if (STATE.hwSelected.includes(card.id)) el.classList.add('selected');
+      el.addEventListener('click', () => toggleHwCard(card.id));
+    }
+    if (STATE.phase === 'abstractSwap' && STATE.waitingDiscardForAbstract) {
+      el.classList.add('selectable');
+      el.addEventListener('click', () => replaceWithAbstract(card.id));
+    }
+    grid.appendChild(el);
+  });
+
+  // Empty slots
+  for (let i = STATE.deck.length; i < DECK_MAX; i++) {
+    const s = document.createElement('div');
+    s.className = 'card empty';
+    s.innerHTML = '<div class="c-sym" style="opacity:.2">—</div><div class="c-type">Empty</div>';
+    grid.appendChild(s);
+  }
+
+  cap.textContent = `${STATE.deck.length} / ${DECK_MAX}`;
+  cap.className = STATE.deck.length >= DECK_MAX ? 'full' : '';
+}
+
+/* ═══════════════════════════════════════════════════════════
+   RENDER — HEADER + ACTIONS
+═══════════════════════════════════════════════════════════ */
+
+function renderHeader() {
+  document.getElementById('day-label').textContent =
+    `Day ${STATE.day} · ${DAY_NAMES[STATE.day] || ''}`;
+  const phaseNames = { setup:'20 Concrete Cards', abstractSwap:'Abstract Swap', morning:'Morning', afternoon:'Afternoon', done:'—' };
+  document.getElementById('phase-tag').textContent = phaseNames[STATE.phase] || STATE.phase;
+  renderEnergy();
+}
+
+function renderActions() {
+  const area = document.getElementById('action-area');
+  area.innerHTML = '';
+  renderHeader();
+
+  if (STATE.phase === 'setup') buildSetupUI(area);
+  else if (STATE.phase === 'abstractSwap') buildAbstractSwapUI(area);
+  else if (STATE.phase === 'morning')   buildMorningUI(area);
+  else if (STATE.phase === 'afternoon') buildAfternoonUI(area);
+}
+
+
+/* ── Blogger Setup UI: 20 concrete cards → choose 10 ── */
+function buildSetupUI(area) {
+  const title = document.createElement('div');
+  title.className = 'area-title';
+  title.textContent = 'Step 1 — Choose 10 Concrete Cards / 从 20 张具象卡中选择 10 张';
+  area.appendChild(title);
+
+  const note = document.createElement('div');
+  note.className = 'setup-note';
+  note.innerHTML = '第一面将 <strong>20 张具象卡（母语信息）</strong> 平铺展示。玩家需要自行选择 <strong>10 张</strong> 作为初始牌组，然后进入 3 轮抽象卡刷新。';
+  area.appendChild(note);
+
+  const topbar = document.createElement('div');
+  topbar.className = 'setup-topbar';
+  topbar.innerHTML = `<span class="setup-count">已选择 ${STATE.selectedNative.length} / 10</span>`;
+  const startBtn = document.createElement('button');
+  startBtn.className = 'btn hi';
+  startBtn.textContent = '进入 3 轮抽象卡刷新 →';
+  startBtn.disabled = STATE.selectedNative.length !== 10;
+  startBtn.addEventListener('click', startAbstractSwapPhase);
+  topbar.appendChild(startBtn);
+  area.appendChild(topbar);
+
+  const grid = document.createElement('div');
+  grid.className = 'deck-grid';
+  NATIVE_CARDS.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (STATE.selectedNative.includes(card.id)) el.classList.add('selected');
+    if (!STATE.selectedNative.includes(card.id) && STATE.selectedNative.length >= 10) el.classList.add('locked');
+    el.addEventListener('click', () => toggleNativeSelection(card.id));
+    grid.appendChild(el);
+  });
+  area.appendChild(grid);
+}
+
+function toggleNativeSelection(id) {
+  const idx = STATE.selectedNative.indexOf(id);
+  if (idx >= 0) {
+    STATE.selectedNative.splice(idx, 1);
+  } else {
+    if (STATE.selectedNative.length >= 10) {
+      setLog('最多只能选择 10 张具象卡。取消一张后才能选择新的卡。');
+      return;
+    }
+    STATE.selectedNative.push(id);
+  }
+  STATE.deck = STATE.selectedNative.map(cid => ({ ...NATIVE_CARDS.find(c => c.id === cid) }));
+  setLog(`已选择 ${STATE.selectedNative.length}/10 张具象卡。`);
+  renderActions();
+  renderDeck();
+}
+
+function startAbstractSwapPhase() {
+  if (STATE.selectedNative.length !== 10) {
+    setLog('请先选择满 10 张具象卡，再进入抽象卡刷新。');
+    return;
+  }
+  STATE.deck = STATE.selectedNative.map(cid => ({ ...NATIVE_CARDS.find(c => c.id === cid) }));
+  STATE.phase = 'abstractSwap';
+  STATE.abstractRound = 1;
+  STATE.currentAbstractCard = pickAbstract();
+  STATE.waitingDiscardForAbstract = false;
+  setLog('进入抽象卡刷新：每轮可以放弃 1 张当前卡来换取新增抽象卡，也可以跳过不换。');
+  renderActions();
+  renderDeck();
+}
+
+/* ── Blogger Abstract Swap UI: 3 rounds, swap or skip ── */
+function buildAbstractSwapUI(area) {
+  const title = document.createElement('div');
+  title.className = 'area-title';
+  title.textContent = `Step 2 — Abstract Card Refresh / 第 ${STATE.abstractRound} 轮，共 3 轮`;
+  area.appendChild(title);
+
+  const note = document.createElement('div');
+  note.className = 'setup-note';
+  note.textContent = STATE.waitingDiscardForAbstract
+    ? '请选择你要放弃的一张当前卡。点击下方 Deck 中任意一张卡后，新抽象卡会替换它。'
+    : '本轮出现 1 张新增抽象卡。你可以选择“放弃一张卡换取它”，也可以选择“跳过本轮”。';
+  area.appendChild(note);
+
+  const card = STATE.currentAbstractCard;
+  const preview = document.createElement('div');
+  preview.className = 'abstract-card-preview';
+  preview.innerHTML = `<div class="big">${card.sym}</div><div class="name">${card.name}</div><div class="desc">${card.cn || ''}${card.memory ? ' · ' + card.memory : ''}</div>`;
+  area.appendChild(preview);
+
+  const row = document.createElement('div');
+  row.className = 'btn-row';
+  const swapBtn = document.createElement('button');
+  swapBtn.className = 'btn hi';
+  swapBtn.textContent = STATE.waitingDiscardForAbstract ? '正在选择弃牌…' : '放弃 1 张卡，换取这张抽象卡';
+  swapBtn.disabled = STATE.waitingDiscardForAbstract;
+  swapBtn.addEventListener('click', () => {
+    STATE.waitingDiscardForAbstract = true;
+    setLog('请在下方 Deck 中点击 1 张要放弃的卡。');
+    renderActions();
+    renderDeck();
+  });
+  const skipBtn = document.createElement('button');
+  skipBtn.className = 'btn dim';
+  skipBtn.textContent = '跳过本轮，不换卡';
+  skipBtn.addEventListener('click', skipAbstractRound);
+  row.appendChild(swapBtn);
+  row.appendChild(skipBtn);
+  area.appendChild(row);
+}
+
+function replaceWithAbstract(discardId) {
+  if (STATE.phase !== 'abstractSwap' || !STATE.waitingDiscardForAbstract) return;
+  const idx = STATE.deck.findIndex(c => c.id === discardId);
+  if (idx === -1) return;
+  const gone = STATE.deck[idx];
+  const incoming = { ...STATE.currentAbstractCard, id: uid() };
+  STATE.deck.splice(idx, 1, incoming);
+  STATE.waitingDiscardForAbstract = false;
+  setLog(`第 ${STATE.abstractRound} 轮：放弃「${gone.name}」，换取「${incoming.name}」。`);
+  nextAbstractRound();
+}
+
+function skipAbstractRound() {
+  setLog(`第 ${STATE.abstractRound} 轮：跳过换卡，保留当前牌组。`);
+  STATE.waitingDiscardForAbstract = false;
+  nextAbstractRound();
+}
+
+function nextAbstractRound() {
+  if (STATE.abstractRound >= 3) {
+    STATE.phase = 'afternoon';
+    STATE.day = 1;
+    STATE.classAttended = true;
+    STATE.energy = 15;
+    STATE.currentAbstractCard = null;
+    const abs = STATE.deck.filter(c => c.type === 'abstract').length;
+    const con = STATE.deck.filter(c => c.type === 'concrete').length;
+    setLog(`初始构筑完成：当前牌组为 ${con} 张具象卡 + ${abs} 张抽象卡。`);
+    renderActions();
+    renderDeck();
+    return;
+  }
+  STATE.abstractRound += 1;
+  STATE.currentAbstractCard = pickAbstract();
+  renderActions();
+  renderDeck();
+}
+
+/* ── Morning UI ── */
+function buildMorningUI(area) {
+  const title = document.createElement('div');
+  title.className = 'area-title';
+  title.textContent = '09:00  —  Morning';
+  area.appendChild(title);
+
+  const row = document.createElement('div');
+  row.className = 'btn-row';
+
+  if (!STATE.classAttended) {
+    const btn = document.createElement('button');
+    btn.className = 'btn hi';
+    btn.textContent = '🎓  Go to Class  (−3 energy)';
+    btn.addEventListener('click', doClass);
+    const note = document.createElement('span');
+    note.style.cssText = 'font-size:.8rem;color:var(--dim);align-self:center;';
+    note.textContent = 'Mandatory. Captures 5 lecture fragments automatically.';
+    row.appendChild(btn);
+    row.appendChild(note);
+  } else {
+    const note = document.createElement('p');
+    note.style.cssText = 'font-size:.85rem;color:var(--dim);';
+    note.textContent = 'Class done. Afternoon is open.';
+    area.appendChild(note);
+  }
+
+  area.appendChild(row);
+}
+
+/* ── Afternoon UI ── */
+function buildAfternoonUI(area) {
+  // Brief reminder pill
+  const pill = document.createElement('div');
+  pill.id = 'brief-pill';
+  if (STATE.day === CYCLE_DAYS) {
+    pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  <span style="color:var(--accent)">Homework due today — select 4 cards in deck below</span>`;
+  } else {
+    pill.innerHTML = `Week brief: <strong>${STATE.briefSymbol}</strong>  ·  Assignment due Day ${CYCLE_DAYS}`;
+  }
+  area.appendChild(pill);
+
+  // Apartment
+  const apt = makeLocSection('🏠  Apartment');
+  // Telephone swap now opens a modal where you invest one card to swap with family.
+  apt.appendChild(makeLocBtn('📞', 'Call Home',       'Telephone', 0, 'Parents: 2 rounds (≥2 cards) · Friend: 1 round (1 card)', openPhoneModal));
+  // Internet browsing becomes an online search mini‑game requiring three cards and energy.
+  apt.appendChild(makeLocBtn('💻', 'Online Search',    'Internet',  2, 'Invest 2~5 cards (risk & reward)', openNetModal, !hasEnergy(2)));
+
+  // A valid pair requires: concrete.tag === abstract.sym
+  const canSynth = hasEnergy(5)
+    && STATE.deck.some(a => a.type === 'abstract')
+    && STATE.deck.some(b => b.type === 'concrete');
+  const synthNote = canSynth
+    ? '+1 fusion or failed card (contour match = success)'
+    : 'needs 1 abstract + 1 concrete + 5 energy';
+  apt.appendChild(makeLocBtn('📐', 'Synthesize', 'Homework', 5, synthNote, openSynthModal, !canSynth));
+  area.appendChild(apt);
+
+  // Park
+  const park = makeLocSection('🌳  Park');
+  park.appendChild(makeLocBtn('🌊', 'Visit Lake',   'Park · Lake', 2, '+1 concrete card', doLake, !hasEnergy(2)));
+  park.appendChild(makeLocBtn('🌿', 'Walk on Lawn', 'Park · Lawn', 2, '+1 concrete card', doLawn, !hasEnergy(2)));
+  area.appendChild(park);
+
+  // Sleep button
+  const sleepRow = document.createElement('div');
+  sleepRow.className = 'btn-row';
+  sleepRow.style.marginTop = '14px';
+  const sleepBtn = document.createElement('button');
+  sleepBtn.className = 'btn dim';
+  sleepBtn.textContent = STATE.day >= CYCLE_DAYS
+    ? '🌙  End of Week'
+    : `🌙  Sleep  →  Day ${STATE.day + 1}`;
+  sleepBtn.addEventListener('click', doSleep);
+  sleepRow.appendChild(sleepBtn);
+  area.appendChild(sleepRow);
+}
+
+function makeLocSection(title) {
+  const sec = document.createElement('div');
+  sec.className = 'loc-section';
+  const lbl = document.createElement('div');
+  lbl.className = 'loc-section-label';
+  lbl.textContent = title;
+  sec.appendChild(lbl);
+  const grid = document.createElement('div');
+  grid.className = 'loc-grid';
+  sec.appendChild(grid);
+  sec._grid = grid;
+  sec.appendChild = (el) => {
+    if (el.classList && el.classList.contains('loc-btn')) sec._grid.appendChild(el);
+    else HTMLElement.prototype.appendChild.call(sec, el);
+  };
+  return sec;
+}
+
+function makeLocBtn(icon, name, sub, cost, yieldStr, handler, disabled = false) {
+  const btn = document.createElement('button');
+  btn.className = 'loc-btn';
+  btn.disabled  = disabled;
+  btn.innerHTML =
+    `<div class="li">${icon}</div>` +
+    `<div class="ln">${name}</div>` +
+    `<div class="lc">${sub} · ${cost === 0 ? 'Free' : `−${cost} energy`}</div>` +
+    `<div class="ly">${yieldStr}</div>`;
+  if (!disabled) btn.addEventListener('click', handler);
+  return btn;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ACTIONS
+═══════════════════════════════════════════════════════════ */
+
+function doClass() {
+  spend(3);
+  STATE.classAttended = true;
+  const cards = Array.from({ length: 5 }, () => pickAbstract());
+  setLog(`Class: captured 5 fragments → ${cards.map(c => c.sym + ' ' + c.name).join(' / ')}`);
+  renderHeader();
+
+  enqueue(cards, () => {
+    STATE.phase = 'afternoon';
+    if (STATE.day === CYCLE_DAYS) showHomework();
+    renderActions();
+  });
+}
+
+function doTelephone() {
+  const card = pickConcrete('telephone');
+  const memNote = card.memory ? `  "${card.memory}"` : '';
+  setLog(`📞 Called home.${memNote}  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doInternet() {
+  if (!hasEnergy(2)) return;
+  spend(2);
+  renderHeader();
+  const card = pickConcrete('internet');
+  setLog(`💻 Browsed online.  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doLake() {
+  if (!hasEnergy(2)) return;
+  spend(2);
+  renderHeader();
+  const card = pickConcrete('lake');
+  setLog(`🌊 Visited the lake.  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doLawn() {
+  if (!hasEnergy(2)) return;
+  spend(2);
+  renderHeader();
+  const card = pickConcrete('lawn');
+  setLog(`🌿 Walked on the lawn.  →  ${card.sym} ${card.name}`);
+  enqueue([card], () => renderActions());
+}
+
+function doSleep() {
+  if (STATE.day >= CYCLE_DAYS) {
+    STATE.phase = 'done';
+    setLog('Week over.');
+    renderActions();
+    showEnd('End of Week', 'You didn\'t submit the assignment. The brief remains unanswered.');
+    return;
+  }
+  STATE.day++;
+  STATE.energy        = 15;
+  STATE.classAttended = false;
+  STATE.phase         = 'morning';
+  setLog(`Day ${STATE.day}. New day.`);
+  renderActions();
+  renderDeck();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HOMEWORK
+═══════════════════════════════════════════════════════════ */
+
+function showHomework() {
+  STATE.hwActive   = true;
+  STATE.hwSelected = [];
+
+  const area = document.getElementById('hw-area');
+  area.style.display = 'block';
+
+  document.getElementById('hw-brief').innerHTML =
+    `Brief symbol: <span class="sym">${STATE.briefSymbol}</span>` +
+    `<div style="font-size:.82rem;color:var(--dim);margin-top:4px">` +
+    `Cards whose <em>tag</em> matches <strong>${STATE.briefSymbol}</strong> count as on-brief.</div>`;
+
+  updateHwSelection();
+  renderDeck();
+
+  document.getElementById('hw-submit').onclick = submitHomework;
+}
+
+function toggleHwCard(id) {
+  if (!STATE.hwActive) return;
+  const idx = STATE.hwSelected.indexOf(id);
+  if (idx >= 0) {
+    STATE.hwSelected.splice(idx, 1);
+  } else {
+    if (STATE.hwSelected.length >= 4) {
+      setLog('Already selected 4 cards. Deselect one first.');
+      return;
+    }
+    STATE.hwSelected.push(id);
+  }
+  updateHwSelection();
+  renderDeck();
+}
+
+function updateHwSelection() {
+  const box = document.getElementById('hw-selection');
+  const btn = document.getElementById('hw-submit');
+  if (!STATE.hwSelected.length) {
+    box.innerHTML = '<span style="color:var(--dim);font-size:.82rem">No cards selected</span>';
+  } else {
+    box.innerHTML = STATE.hwSelected.map(id => {
+      const c = STATE.deck.find(x => x.id === id);
+      return c ? `<span class="hw-tag">${c.sym} ${c.name}</span>` : '';
+    }).join('');
+  }
+  btn.disabled = STATE.hwSelected.length !== 4;
+}
+
+function submitHomework() {
+  const selected = STATE.hwSelected.map(id => STATE.deck.find(c => c.id === id)).filter(Boolean);
+  if (selected.length !== 4) return;
+
+  const brief = STATE.briefSymbol;
+
+  // ── A. Theme Match ──
+  let hits = 0;
+  const judgeLines = [];
+  selected.forEach(card => {
+    const match = card.tag === brief;
+    if (match) hits++;
+    const line = `${match ? '✓' : '✗'}  "${card.name}"  [${card.type}, tag:${card.tag}]  →  ${match ? 'ON brief' : 'off brief'}`;
+    judgeLines.push(line);
+    console.log('[Homework Judge]', line);
+  });
+  const themePass = hits >= 3;
+  console.log(`[Homework] Theme: ${hits}/4 match "${brief}" → ${themePass ? 'PASS' : 'FAIL'}`);
+
+  // ── B. Diversity ──
+  // Fusion counts as BOTH abstract and concrete (GDD §6.2)
+  // BUT 4 fusion = single type → penalised
+  const allFusion = selected.every(c => c.type === 'fusion');
+  const typeSet = new Set();
+  selected.forEach(c => {
+    if (c.type === 'fusion') { typeSet.add('abstract'); typeSet.add('concrete'); }
+    else typeSet.add(c.type);
+  });
+  const diversity = allFusion ? 1 : typeSet.size;
+  const divLabel  = diversity >= 3 ? 'high' : diversity === 2 ? 'medium' : 'low';
+  console.log(`[Homework] Types: ${[...typeSet].join('+')}${allFusion ? ' (all-fusion penalty)' : ''} → diversity: ${divLabel}`);
+
+  // ── C. Failed card penalty (GDD §6.2 v0.4) ──
+  const failedCount   = selected.filter(c => c.type === 'failed-forced').length;
+  const failedPenalty = failedCount * 10;
+  console.log(`[Homework] Failed cards: ${failedCount} × −10 = −${failedPenalty} pts`);
+
+  // ── Feedback table (GDD §6.2) ──
+  const FEEDBACK = {
+    'fail-low':    { grade:'D',  quote:'"I don\'t see how this engages with the brief."' },
+    'fail-medium': { grade:'C',  quote:'"Some engagement, but where\'s the brief in this?"' },
+    'fail-high':   { grade:'C+', quote:'"Rich vocabulary, but you didn\'t answer the question."' },
+    'pass-low':    { grade:'B-', quote:'"Technically on-brief, but where\'s the work?"' },
+    'pass-medium': { grade:'B',  quote:'"Some engagement, but feels collaged."' },
+    'pass-high':   { grade:'A',  quote:'"A clear voice working through the brief. This is the work."' },
+  };
+  const key = `${themePass ? 'pass' : 'fail'}-${divLabel}`;
+  const fb  = allFusion
+    ? { grade:'B-', quote:'"Strong voice but underdeveloped — where\'s the rigor?"' }
+    : (FEEDBACK[key] || { grade:'C', quote:'"Submission received."' });
+
+  console.log(`[Homework] Key: ${allFusion ? 'all-fusion' : key} → Grade: ${fb.grade}`);
+
+  // ── Show feedback ──
+  STATE.hwActive = false;
+  STATE.phase = 'done';
+  document.getElementById('hw-area').style.display = 'none';
+  document.getElementById('action-area').innerHTML = '';
+  renderDeck();
+
+  const fbArea = document.getElementById('fb-area');
+  fbArea.style.display = 'block';
+  document.getElementById('fb-grade').textContent = `Grade: ${fb.grade}${failedPenalty > 0 ? '  (−' + failedPenalty + ' pts — failed cards)' : ''}`;
+  document.getElementById('fb-quote').textContent = fb.quote;
+  document.getElementById('fb-detail').textContent = [
+    `Brief: "${brief}"`,
+    `Theme match: ${hits}/4 on-brief  (threshold: 3)  →  ${themePass ? 'PASSED' : 'FAILED'}`,
+    `Diversity: ${[...typeSet].join(' + ')}${allFusion ? '  (all-fusion — penalised)' : ''}  →  ${divLabel}`,
+    `Failed cards: ${failedCount} × −10 pts  →  ${failedPenalty > 0 ? '−' + failedPenalty + ' pts penalty' : 'none'}`,
+    '',
+    'Per-card:',
+    ...judgeLines,
+  ].join('\n');
+
+  document.getElementById('fb-next').onclick = () => {
+    fbArea.style.display = 'none';
+    const { title, body } = getEnding();
+    showEnd(title, body);
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ENDING  (GDD §7)
+═══════════════════════════════════════════════════════════ */
+
+function getEnding() {
+  const native = STATE.deck.filter(c => c.origin === 'native').length;
+  const fusion = STATE.deck.filter(c => c.type === 'fusion').length;
+  const absFus = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
+
+  if (fusion >= 3) {
+    return { title: 'Fluent in Two Tongues',
+             body:  'Neither fully here nor there. Both. It\'s exhausting. It\'s yours.' };
+  }
+  if (native <= 2 && fusion === 0) {
+    return { title: 'Clean Slate',
+             body:  'The work is clean. The calls feel further away. You\'ve let a lot go.' };
+  }
+  if (native >= 6 && absFus <= 2) {
+    return { title: 'Untranslated',
+             body:  'The corridors are still noise. But home is still home. For now.' };
+  }
+  return { title: 'End of Week 1',
+           body:  'The semester continues. Four more weeks to figure this out.' };
+}
+
+function showEnd(title, body) {
+  document.getElementById('end-area').style.display = 'block';
+  document.getElementById('end-title').textContent = title;
+  document.getElementById('end-body').textContent  = body;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CHAT EVENT MECHANIC (from 电话换卡机制.md)
+   - 爸爸 / 妈妈：固定 3 轮，不提前结束；三轮后统一结算。
+   - 朋友：最多 3 轮；每轮即时匹配，低于 70% 吞掉本轮卡牌并提前结束。
+════════════════════════════════════════════════════════════ */
+
+let phoneSelectedPerson = null;
+let phoneSelectedCards  = [];
+let phoneCurrentRound   = 0;
+let phoneMaxRounds      = 3;
+let phoneHistory        = [];
+let phoneSessionQuestions = [];
+
+const CHAT_CONFIG = {
+  dad: {
+    label: '爸爸',
+    lowRisk: true,
+    questions: [
+      { text:'英国今天天气怎么样呀？', type:'天气问题', valid:['雨伞','衣服'] },
+      { text:'你是坐什么交通工具出去的？', type:'交通问题', valid:['巴士','的士'] },
+      { text:'有没有学到什么很特别的知识？', type:'知识问题', valid:['醒狮狮头','英歌舞脸谱','渔女雕像'] },
+    ],
+  },
+  mom: {
+    label: '妈妈',
+    lowRisk: true,
+    questions: [
+      { text:'那边的饮食还习惯吗？', type:'饮食问题', valid:['竹蒸笼','荔枝','炭烤生蚝','白切鸡','乳鸽','蛋挞','口盅'] },
+      { text:'温度怎么样？', type:'天气问题', valid:['雨伞','衣服','短裤'] },
+      { text:'有没有多喝水呀？', type:'关怀问题', valid:['口盅','工夫茶茶具'] },
+    ],
+  },
+  friend: {
+    label: '朋友',
+    lowRisk: false,
+    // 朋友聊天每次打开都会从问题池随机抽 3 个问题，避免每次都是同一组问题。
+    questions: [
+      { text:'你那边现在几点？', type:'日常时间', valid:['巴士','的士','霓虹招牌','工厂工牌'] },
+      { text:'天气怎么样？', type:'天气闲聊', valid:['雨伞','衣服','短裤'] },
+      { text:'有没有吃到什么好吃的？', type:'食物闲聊', valid:['竹蒸笼','荔枝','炭烤生蚝','白切鸡','乳鸽','蛋挞','口盅','工夫茶茶具'] },
+      { text:'今天有没有发生什么有趣的事情？', type:'趣事分享', valid:['醒狮狮头','英歌舞脸谱','渔女雕像','利是','霓虹招牌','工厂工牌'] },
+      { text:'你最近有没有想家？', type:'情绪表达', valid:['竹蒸笼','工夫茶茶具','利是','醒狮狮头','口盅'] },
+      { text:'你那边出门方便吗？', type:'出行闲聊', valid:['巴士','的士','雨伞','衣服'] },
+      { text:'有没有看到什么和家乡很像的东西？', type:'文化联想', valid:['霓虹招牌','醒狮狮头','英歌舞脸谱','渔女雕像','竹蒸笼','工夫茶茶具'] },
+      { text:'你最近学习压力大吗？', type:'学习状态', valid:['工厂工牌','衣服','短裤','口盅'] },
+      { text:'有没有什么东西让你觉得自己慢慢适应了？', type:'适应生活', valid:['巴士','的士','霓虹招牌','雨伞','衣服','蛋挞'] },
+      { text:'你现在最想和我分享哪一张照片？', type:'开放分享', valid:['霓虹招牌','渔女雕像','醒狮狮头','英歌舞脸谱','荔枝','蛋挞'] },
+    ],
+  },
+};
+
+function openPhoneModal() {
+  phoneSelectedPerson = null;
+  phoneSelectedCards  = [];
+  phoneCurrentRound   = 0;
+  phoneMaxRounds      = 3;
+  phoneHistory        = [];
+  phoneSessionQuestions = [];
+
+  document.getElementById('phone-next-round').style.display = 'none';
+  const finishBtn = document.getElementById('phone-finish');
+  finishBtn.style.display = 'none';
+  finishBtn.disabled = true;
+  finishBtn.textContent = '提交本轮回答';
+
+  document.getElementById('phone-step-desc').textContent =
+    '选择聊天对象。父母固定 3 轮，三轮后统一结算；朋友最多 3 轮，每次打开都会随机刷新问题，匹配度过低会提前结束。';
+  document.getElementById('phone-person-section').style.display = 'block';
+  document.getElementById('phone-card-section').style.display = 'none';
+
+  document.querySelectorAll('#phone-person-section button[data-person]').forEach(btn => {
+    btn.onclick = () => {
+      phoneSelectedPerson = btn.getAttribute('data-person');
+      phoneCurrentRound = 0;
+      phoneHistory = [];
+      phoneSessionQuestions = phoneSelectedPerson === 'friend'
+        ? getRandomFriendQuestions(3)
+        : CHAT_CONFIG[phoneSelectedPerson].questions;
+      showPhoneCardSelection();
+    };
+  });
+
+  document.getElementById('modal-phone').classList.add('open');
+}
+
+function getRandomFriendQuestions(count = 3) {
+  const pool = CHAT_CONFIG.friend.questions.slice();
+  // Fisher–Yates shuffle: each phone call receives a fresh order and fresh question set.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, count);
+}
+
+function getPhoneQuestion() {
+  const cfg = CHAT_CONFIG[phoneSelectedPerson];
+  const questions = phoneSessionQuestions.length ? phoneSessionQuestions : cfg.questions;
+  return questions[Math.max(0, phoneCurrentRound - 1)];
+}
+
+function getMinCardsForPhoneRound() {
+  return phoneSelectedPerson === 'friend' ? 2 : 1;
+}
+
+function getMaxCardsForPhoneRound() {
+  return phoneSelectedPerson === 'friend' ? 5 : 3;
+}
+
+function showPhoneCardSelection() {
+  if (!phoneSelectedPerson) return;
+  phoneCurrentRound++;
+  phoneSelectedCards = [];
+
+  const cfg = CHAT_CONFIG[phoneSelectedPerson];
+  const q = getPhoneQuestion();
+  const min = getMinCardsForPhoneRound();
+  const max = getMaxCardsForPhoneRound();
+
+  document.getElementById('phone-person-section').style.display = 'none';
+  document.getElementById('phone-card-section').style.display = 'block';
+  document.getElementById('phone-next-round').style.display = 'none';
+
+  const finishBtn = document.getElementById('phone-finish');
+  finishBtn.style.display = 'inline-block';
+  finishBtn.disabled = true;
+  finishBtn.textContent = '提交本轮回答';
+
+  document.getElementById('phone-step-desc').innerHTML =
+    `<strong>${cfg.label} · 第 ${phoneCurrentRound}/3 轮</strong><br>` +
+    `“${q.text}”<br>` +
+    `<span style="color:var(--dim)">${cfg.lowRisk ? '父母聊天不会提前结束；三轮累计至少需要 1 张具象卡 + 1 张抽象卡。' : '朋友聊天每次打开都会随机刷新问题；每轮至少 2 张卡，匹配度低于 70% 会吞掉本轮卡牌并提前结束。'}</span>`;
+
+  const inst = document.getElementById('phone-card-instructions');
+  if (inst) inst.textContent = `请选择 ${min}–${max} 张卡作答。当前已选择 0 张。`;
+
+  renderPhoneCardGrid();
+}
+
+function renderPhoneCardGrid() {
+  const grid = document.getElementById('phone-card-grid');
+  const min = getMinCardsForPhoneRound();
+  const max = getMaxCardsForPhoneRound();
+  grid.innerHTML = '';
+
+  STATE.deck.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (phoneSelectedCards.some(sel => sel.id === card.id)) el.classList.add('selected');
+    el.addEventListener('click', () => togglePhoneCard(card));
+    grid.appendChild(el);
+  });
+
+  const inst = document.getElementById('phone-card-instructions');
+  if (inst) inst.textContent = `请选择 ${min}–${max} 张卡作答。当前已选择 ${phoneSelectedCards.length} 张。`;
+  const finishBtn = document.getElementById('phone-finish');
+  if (finishBtn) finishBtn.disabled = phoneSelectedCards.length < min;
+}
+
+function togglePhoneCard(card) {
+  const max = getMaxCardsForPhoneRound();
+  const idx = phoneSelectedCards.findIndex(sel => sel.id === card.id);
+  if (idx >= 0) phoneSelectedCards.splice(idx, 1);
+  else {
+    if (phoneSelectedCards.length >= max) {
+      setLog(`本轮最多选择 ${max} 张卡。`);
+      return;
+    }
+    phoneSelectedCards.push(card);
+  }
+  renderPhoneCardGrid();
+}
+
+function submitPhoneRound() {
+  if (!phoneSelectedPerson || !phoneSelectedCards.length) return;
+  if (phoneSelectedPerson === 'friend') resolveFriendRound();
+  else resolveParentRound();
+}
+
+function scoreCardsForQuestion(cards, question, isFriend = false) {
+  const names = cards.map(c => c.name);
+  const exactHits = cards.filter(c => question.valid.includes(c.name)).length;
+  const abstractHits = cards.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
+  let score = Math.round((exactHits / Math.max(1, cards.length)) * 100);
+
+  if (isFriend) {
+    // 朋友聊天更开放：具象相关卡给主要分，抽象/融合卡提供语义补充。
+    score = Math.min(100, Math.round((exactHits * 45) + (abstractHits * 20) + (cards.length >= 2 ? 20 : 0)));
+    if (exactHits === 0 && abstractHits > 0) score = Math.max(score, 65);
+  } else {
+    // 父母聊天：问题对应卡最重要；抽象卡可以提交，但主要用于满足累计条件。
+    score = Math.min(100, Math.round((exactHits > 0 ? 80 : 0) + Math.min(20, abstractHits * 10)));
+  }
+
+  return { score, exactHits, abstractHits, names };
+}
+
+function removeSubmittedCards(cards) {
+  cards.forEach(sel => {
+    const i = STATE.deck.findIndex(c => c.id === sel.id);
+    if (i !== -1) STATE.deck.splice(i, 1);
+  });
+  renderDeck();
+}
+
+function resolveParentRound() {
+  const cfg = CHAT_CONFIG[phoneSelectedPerson];
+  const q = getPhoneQuestion();
+  const submitted = phoneSelectedCards.slice();
+  const result = scoreCardsForQuestion(submitted, q, false);
+
+  // 父母聊天不会因为单轮错误而吞卡：这里只记录提交，卡仍留在手牌中。
+  phoneHistory.push({ round: phoneCurrentRound, question: q, cards: submitted, result });
+  setLog(`📞 ${cfg.label}第 ${phoneCurrentRound} 轮：提交 ${submitted.map(c => c.name).join(' / ')}，本轮匹配度 ${result.score}%。父母聊天会在三轮后统一结算。`);
+
+  if (phoneCurrentRound < 3) {
+    showPhoneCardSelection();
+  } else {
+    finishParentChat();
+  }
+}
+
+function finishParentChat() {
+  const cfg = CHAT_CONFIG[phoneSelectedPerson];
+  const allCards = phoneHistory.flatMap(h => h.cards);
+  const hasConcrete = allCards.some(c => c.type === 'concrete');
+  const hasAbstract = allCards.some(c => c.type === 'abstract' || c.type === 'fusion');
+
+  document.getElementById('modal-phone').classList.remove('open');
+
+  if (!hasConcrete || !hasAbstract) {
+    setLog(`📞 ${cfg.label}聊天结束：本次提交无效。三轮累计需要至少 1 张具象卡 + 1 张抽象卡；本次没有吞卡，也没有奖励。`);
+    phoneSelectedPerson = null;
+    renderActions();
+    return;
+  }
+
+  const avg = Math.round(phoneHistory.reduce((sum, h) => sum + h.result.score, 0) / phoneHistory.length);
+  if (avg >= 90) {
+    const reward = chooseHelpfulChatReward();
+    setLog(`📞 ${cfg.label}聊天完成：综合正确率 ${avg}%，获得一张可能会用到的卡：${reward.sym} ${reward.name}。`);
+    enqueue([reward], () => renderActions());
+  } else {
+    setLog(`📞 ${cfg.label}聊天完成：综合正确率 ${avg}%，低于 90%，无法获得奖励；本次不会吞卡。`);
+    renderActions();
+  }
+
+  phoneSelectedPerson = null;
+}
+
+function resolveFriendRound() {
+  const cfg = CHAT_CONFIG.friend;
+  const q = getPhoneQuestion();
+  const submitted = phoneSelectedCards.slice();
+  const result = scoreCardsForQuestion(submitted, q, true);
+
+  phoneHistory.push({ round: phoneCurrentRound, question: q, cards: submitted, result });
+
+  if (result.score < 70) {
+    removeSubmittedCards(submitted);
+    document.getElementById('modal-phone').classList.remove('open');
+    setLog(`📞 朋友第 ${phoneCurrentRound} 轮：匹配度 ${result.score}%，低于 70%。聊天提前结束，本轮提交卡牌被吞掉：${submitted.map(c => c.name).join(' / ')}。`);
+    phoneSelectedPerson = null;
+    renderActions();
+    return;
+  }
+
+  setLog(`📞 朋友第 ${phoneCurrentRound} 轮：匹配度 ${result.score}%，回答自然，进入下一轮。`);
+
+  if (phoneCurrentRound < 3) {
+    showPhoneCardSelection();
+  } else {
+    document.getElementById('modal-phone').classList.remove('open');
+    const fusion = makeFriendFusionReward();
+    setLog(`📞 朋友聊天三轮完成：每轮匹配度均 ≥70%，获得最终融合卡：${fusion.sym} ${fusion.name}。`);
+    phoneSelectedPerson = null;
+    enqueue([fusion], () => renderActions());
+  }
+}
+
+function chooseHelpfulChatReward() {
+  const concreteCount = STATE.deck.filter(c => c.type === 'concrete').length;
+  const abstractCount = STATE.deck.filter(c => c.type === 'abstract' || c.type === 'fusion').length;
+  if (abstractCount <= concreteCount) return pickAbstract();
+  return pickConcrete('telephone');
+}
+
+function makeFriendFusionReward() {
+  const names = ['异乡日常', '文化连接', '被理解的瞬间', '跨文化记忆', '朋友的回应', '共同话题'];
+  const tags = ['⚪','◻','△','◇'];
+  const tag = rand(tags);
+  return {
+    id: uid(),
+    type: 'fusion',
+    origin: 'telephone',
+    sym: '💬+' + tag,
+    name: rand(names),
+    tag,
+    contour: tag,
+    memory: '三轮聊天之后，有些话终于被朋友接住了。',
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INTERNET SEARCH MECHANIC
+════════════════════════════════════════════════════════════ */
+
+let netSelected = [];
+// Selected direction for the internet search mini-game
+let netSelectedDirection = null;
+
+function openNetModal() {
+  // Only allow if enough energy
+  if (!hasEnergy(2)) return;
+  // Reset selections
+  netSelected = [];
+  netSelectedDirection = null;
+  // Reset validation toggle and its handler
+  const validateCheckbox = document.getElementById('net-validate');
+  if (validateCheckbox) {
+    validateCheckbox.checked = false;
+    validateCheckbox.onchange = () => renderNetModal();
+  }
+  // Prepare UI: show direction selection, hide card selection
+  const dirSection  = document.getElementById('net-direction-section');
+  const cardSection = document.getElementById('net-card-section');
+  const stepDesc    = document.getElementById('net-step-desc');
+  if (dirSection && cardSection && stepDesc) {
+    dirSection.style.display = 'block';
+    cardSection.style.display = 'none';
+    stepDesc.textContent = '选择一个方向开始检索。本次上网将一次性投入 2~5 张卡。';
+    // Attach click handlers for direction buttons
+    const dirBtns = document.querySelectorAll('#net-direction-section button[data-direction]');
+    dirBtns.forEach(btn => {
+      btn.onclick = () => {
+        netSelectedDirection = btn.getAttribute('data-direction');
+        showNetCardSelection();
+      };
+    });
+  }
+  document.getElementById('modal-net').classList.add('open');
+}
+
+// After selecting a search direction, show the card selection step and reset selections
+function showNetCardSelection() {
+  if (!netSelectedDirection) return;
+  const dirSection  = document.getElementById('net-direction-section');
+  const cardSection = document.getElementById('net-card-section');
+  const stepDesc    = document.getElementById('net-step-desc');
+  if (dirSection && cardSection && stepDesc) {
+    dirSection.style.display = 'none';
+    cardSection.style.display = 'block';
+    stepDesc.textContent = '已选择方向：' + getDirectionLabel(netSelectedDirection) + '。请选择 2~5 张卡作为检索包。';
+  }
+  netSelected = [];
+  renderNetModal();
+}
+
+// Map internal direction keys to human-friendly labels
+function getDirectionLabel(dir) {
+  if (dir === 'events') return '本地活动';
+  if (dir === 'shopping') return '日常购物';
+  if (dir === 'transit') return '城市出行';
+  return '';
+}
+
+function renderNetModal() {
+  const grid = document.getElementById('net-card-grid');
+  grid.innerHTML = '';
+  STATE.deck.forEach(card => {
+    const el = makeCardEl(card);
+    el.classList.add('selectable');
+    if (netSelected.includes(card.id)) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      toggleNetCard(card.id);
+    });
+    grid.appendChild(el);
+  });
+  const confirmBtn = document.getElementById('net-confirm');
+  if (confirmBtn) {
+    // Enable only when between 2 and 5 cards selected
+    confirmBtn.disabled = (netSelected.length < 2 || netSelected.length > 5);
+  }
+  // Compute four-outcome probabilities (target/general/abstract/loss)
+  const riskEl = document.getElementById('net-risk');
+  if (riskEl) {
+    const validate = document.getElementById('net-validate').checked;
+    let P_target = 10;
+    let P_general = 15;
+    let P_loss = 25;
+    if (validate) {
+      P_loss = Math.max(0, P_loss - 8);
+    }
+    const P_abstract = Math.max(0, 100 - P_target - P_general - P_loss);
+    riskEl.textContent = `概率预估 — 目标复合: ${P_target}% , 一般复合: ${P_general}% , 抽象卡: ${P_abstract}% , 全损: ${P_loss}%`;
+  }
+}
+
+function toggleNetCard(id) {
+  const idx = netSelected.indexOf(id);
+  if (idx === -1) {
+    // Limit the search bundle to a maximum of 5 cards
+    if (netSelected.length < 5) netSelected.push(id);
+  } else {
+    netSelected.splice(idx, 1);
+  }
+  renderNetModal();
+}
+
+function doConfirmNetSearch() {
+  // Ensure a valid number of selected cards (2–5)
+  if (netSelected.length < 2 || netSelected.length > 5) return;
+  // Spend energy for search (cost fixed at 2 energy)
+  spend(2);
+  // Remove selected cards from the deck
+  netSelected.forEach(cardId => {
+    const idx = STATE.deck.findIndex(c => c.id === cardId);
+    if (idx !== -1) STATE.deck.splice(idx, 1);
+  });
+  renderDeck();
+  // Determine outcome probabilities based on baseline values and validation toggle
+  const validate   = document.getElementById('net-validate').checked;
+  // Baseline probabilities (MD《上网机制》MVP): target 10%, general 15%, abstract 50%, loss 25%
+  let P_target  = 10;
+  let P_general = 15;
+  let P_loss    = 25;
+  // Validation reduces total loss probability
+  if (validate) {
+    P_loss = Math.max(0, P_loss - 8);
+  }
+  // Ensure probabilities sum to 100% by adjusting abstract
+  let P_abstract = Math.max(0, 100 - P_target - P_general - P_loss);
+  // Sample a random outcome
+  const roll = Math.random() * 100;
+  let outcome;
+  if (roll < P_target) {
+    outcome = 'target';
+  } else if (roll < P_target + P_general) {
+    outcome = 'general';
+  } else if (roll < P_target + P_general + P_abstract) {
+    outcome = 'abstract';
+  } else {
+    outcome = 'loss';
+  }
+  const results = [];
+  // Handle each outcome
+  if (outcome === 'target') {
+    // Produce a high‑match fusion card (目标复合卡)
+    const abs = pickAbstract();
+    const con = pickConcrete('internet');
+    const fusion = {
+      id:      uid(),
+      type:    'fusion',
+      origin:  'internet',
+      sym:     con.sym + '+' + abs.sym,
+      name:    con.name + ' / ' + abs.name,
+      tag:     abs.tag,
+      contour: abs.sym,
+      memory:  con.memory || null,
+    };
+    results.push(fusion);
+    const dirLabel = getDirectionLabel(netSelectedDirection) || '';
+    setLog(`💻 上网结果：目标复合卡！${dirLabel ? '[' + dirLabel + '] ' : ''}你获得了"${fusion.name}"。`);
+  } else if (outcome === 'general') {
+    // Produce a general fusion card (一般复合卡)
+    const abs = pickAbstract();
+    const con = pickConcrete('internet');
+    const fusion = {
+      id:      uid(),
+      type:    'fusion',
+      origin:  'internet',
+      sym:     con.sym + '+' + abs.sym,
+      name:    con.name + ' / ' + abs.name,
+      tag:     abs.tag,
+      contour: abs.sym,
+      memory:  con.memory || null,
+    };
+    results.push(fusion);
+    const dirLabel = getDirectionLabel(netSelectedDirection) || '';
+    setLog(`💻 上网结果：一般复合卡。${dirLabel ? '[' + dirLabel + '] ' : ''}你获得了"${fusion.name}"。`);
+  } else if (outcome === 'abstract') {
+    // Produce a single abstract card (偏航 / 抽象卡)
+    const absCard = pickAbstract();
+    results.push(absCard);
+    const dirLabel = getDirectionLabel(netSelectedDirection) || '';
+    setLog(`💻 上网结果：抽象卡。${dirLabel ? '[' + dirLabel + '] ' : ''}你获得了${absCard.sym} ${absCard.name}。`);
+  } else {
+    // Loss: nothing returned (全损)
+    const dirLabel = getDirectionLabel(netSelectedDirection) || '';
+    setLog(`💻 上网结果：全损。${dirLabel ? '[' + dirLabel + '] ' : ''}所有投入的卡片都被噪声吞没。`);
+  }
+  // Close modal and reset selection state
+  document.getElementById('modal-net').classList.remove('open');
+  netSelected = [];
+  netSelectedDirection = null;
+  // Enqueue result cards, if any
+  if (results.length) {
+    enqueue(results, () => {
+      renderActions();
+    });
+  } else {
+    renderActions();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODAL WIRING  (done once at startup)
+═══════════════════════════════════════════════════════════ */
+
+function wireModals() {
+  document.getElementById('synth-confirm').addEventListener('click', doConfirmSynth);
+  document.getElementById('synth-cancel').addEventListener('click', () => {
+    document.getElementById('modal-synth').classList.remove('open');
+  });
+
+  // Telephone modal controls
+  const phoneCancelBtn = document.getElementById('phone-cancel');
+  if (phoneCancelBtn) {
+    phoneCancelBtn.addEventListener('click', () => {
+      document.getElementById('modal-phone').classList.remove('open');
+      phoneSelectedPerson = null;
+      phoneSelectedCards = [];
+    });
+  }
+
+  const phoneFinishBtn = document.getElementById('phone-finish');
+  if (phoneFinishBtn) {
+    phoneFinishBtn.addEventListener('click', submitPhoneRound);
+  }
+
+  const nextRoundBtn = document.getElementById('phone-next-round');
+  if (nextRoundBtn) {
+    nextRoundBtn.addEventListener('click', showPhoneCardSelection);
+  }
+
+  // Internet search modal controls
+  const netCancelBtn = document.getElementById('net-cancel');
+  if (netCancelBtn) {
+    netCancelBtn.addEventListener('click', () => {
+      document.getElementById('modal-net').classList.remove('open');
+    });
+  }
+  const netConfirmBtn = document.getElementById('net-confirm');
+  if (netConfirmBtn) {
+    netConfirmBtn.addEventListener('click', doConfirmNetSearch);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════ */
+
+function init() {
+  setLog('先从 20 张具象卡中选择 10 张，之后进行 3 轮抽象卡刷新。');
+  wireModals();
+  renderEnergy();
+  renderActions();
+  renderDeck();
+}
+
+init();
+</script>
+</body>
+</html>
